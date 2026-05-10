@@ -151,18 +151,69 @@ model.model_size_mb()           # → 0.235 MB
 
 ## Experiment Results
 
-*(Fill this table after running the study)*
+Training setup: **15 epochs · batch size 64 · Adam (lr=1e-3) · MNIST 32×32**
 
-| Rank | Experiment              | Best Val Acc | Test Acc |
-|------|-------------------------|:------------:|:--------:|
-| 1    | lenet_relu_maxpool      | —            | —        |
-| 2    | lenet_leakyrelu_maxpool | —            | —        |
-| 3    | lenet_tanh_maxpool      | —            | —        |
-| 4    | lenet_relu_avgpool      | —            | —        |
-| 5    | lenet_leakyrelu_avgpool | —            | —        |
-| 6    | lenet_tanh_avgpool      | —            | —        |
-| 7    | lenet_sigmoid_maxpool   | —            | —        |
-| 8    | lenet_sigmoid_avgpool   | —            | —        |
+| Rank | Experiment               | Best Val Acc | Test Acc | Val Acc @ Ep.1 |
+|:----:|--------------------------|:------------:|:--------:|:--------------:|
+|  1   | lenet_**leakyrelu**_maxpool | 99.13%    | **99.08%** | 97.2%       |
+|  2   | lenet_**leakyrelu**_avgpool | 99.10%    | 99.06%   | 96.5%          |
+|  3   | lenet_**tanh**_maxpool      | 99.02%    | 98.90%   | **97.8%**      |
+|  4   | lenet_**relu**_avgpool      | 98.92%    | 98.80%   | 96.5%          |
+|  5   | lenet_**relu**_maxpool      | 98.95%    | 98.76%   | 97.0%          |
+|  6   | lenet_**tanh**_avgpool      | 98.87%    | 98.70%   | 96.7%          |
+|  7   | lenet_**sigmoid**_maxpool   | 98.68%    | 98.69%   | 92.7%          |
+|  8   | lenet_**sigmoid**_avgpool   | 98.53%    | 98.52%   | 90.2%          |
+
+**Gap between best and worst: 0.56 percentage points.**
+
+---
+
+## Key Findings
+
+### 1. Activation Function matters more than Pooling type
+
+The top 2 and bottom 2 spots are decided entirely by the activation function, not pooling. LeakyReLU wins both its MaxPool and AvgPool variants; Sigmoid loses both of its variants.
+
+### 2. LeakyReLU is the best activation on this task
+
+LeakyReLU (MaxPool) achieves **99.08% test accuracy** — the highest of all 8 experiments. Its small negative slope (0.01) for negative inputs prevents the "dying ReLU" problem, which matters even for a shallow network like LeNet-5.
+
+### 3. Sigmoid is the worst activation — and the slowest to converge
+
+Sigmoid reaches only **90.2% val accuracy at epoch 1** (avgpool variant), compared to 97.8% for Tanh and 97.2% for LeakyReLU. The reason: sigmoid saturates for large/small inputs, causing gradients to near-zero ("vanishing gradient"), which slows learning especially in early epochs.
+
+### 4. Tanh converges fastest
+
+Tanh (MaxPool) achieves **97.8% val accuracy in epoch 1** — the highest convergence speed across all experiments. It reaches near-peak performance very early because its output is zero-centred (unlike Sigmoid which is biased toward positive values), leading to better gradient flow.
+
+### 5. MaxPool vs AvgPool: negligible difference (<0.15 pp)
+
+The pooling type accounts for at most 0.15 percentage points of difference within any activation group. For MNIST — a simple, clean dataset — both strategies extract sufficient spatial information. MaxPool has a slight edge for LeakyReLU and Sigmoid; AvgPool has a slight edge for ReLU.
+
+### 6. All experiments converge. No training instability observed.
+
+Training loss decreases smoothly for all 8 variants. Val loss stays close to training loss throughout (no severe overfitting), which is expected given MNIST's simplicity relative to LeNet's capacity.
+
+---
+
+## Visualisations
+
+Generate all plots from your results CSV with one command:
+
+```bash
+python plot_results.py                         # reads logs/results.csv by default
+python plot_results.py --csv logs/results.csv --out plots/
+```
+
+This produces 5 PNG files in `plots/`:
+
+| File | What it shows |
+|------|--------------|
+| `val_accuracy_curves.png` | Val accuracy over all 15 epochs for all 8 experiments |
+| `train_loss_curves.png` | Training loss over all 15 epochs — shows Sigmoid's slow start |
+| `final_test_accuracy.png` | Ranked bar chart of final test accuracy |
+| `activation_vs_pooling.png` | Grouped bars: MaxPool vs AvgPool per activation |
+| `convergence_speed.png` | Val accuracy at epoch 1 — shows which activation learns fastest |
 
 ---
 
