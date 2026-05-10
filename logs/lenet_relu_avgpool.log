@@ -1,0 +1,72 @@
+2026-05-10 13:02:57 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/lenet_relu_avgpool.log
+2026-05-10 13:02:57 | INFO  | ============================================================
+2026-05-10 13:02:57 | INFO  |   EXPERIMENT: lenet_relu_avgpool
+2026-05-10 13:02:57 | INFO  |   Activation : relu
+2026-05-10 13:02:57 | INFO  |   Pooling    : avg
+2026-05-10 13:02:57 | INFO  |   Epochs     : 1
+2026-05-10 13:02:57 | INFO  |   Device     : cuda
+2026-05-10 13:02:57 | INFO  | ============================================================
+2026-05-10 13:02:57 | INFO  | Parameters  : 61,706
+2026-05-10 13:02:57 | INFO  | Model size  : 0.2354 MB
+2026-05-10 13:02:57 | INFO  | [Building model] completed in 0.00s
+2026-05-10 13:02:57 | INFO  | [Epoch 1] completed in 0.12s
+2026-05-10 13:02:57 | INFO  | Epoch   1/1 | Train loss: 2.3114  acc: 0.1094 | Val loss: 2.2993  acc: 0.1094 | Time: 0.1s
+2026-05-10 13:02:57 | INFO  | Dry-run mode: stopping after first epoch.
+2026-05-10 13:02:57 | INFO  | [Total training for lenet_relu_avgpool] completed in 0.13s
+2026-05-10 13:02:57 | INFO  | [Final test evaluation] completed in 0.06s
+2026-05-10 13:02:57 | INFO  | Final test accuracy: 0.1094  (10.94%)
+2026-05-10 13:05:20 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/lenet_relu_avgpool.log
+2026-05-10 13:05:20 | INFO  | ============================================================
+2026-05-10 13:05:20 | INFO  |   EXPERIMENT: lenet_relu_avgpool
+2026-05-10 13:05:20 | INFO  |   Activation : relu
+2026-05-10 13:05:20 | INFO  |   Pooling    : avg
+2026-05-10 13:05:20 | INFO  |   Epochs     : 15
+2026-05-10 13:05:20 | INFO  |   Device     : cuda
+2026-05-10 13:05:20 | INFO  | ============================================================
+2026-05-10 13:05:20 | INFO  | Parameters  : 61,706
+2026-05-10 13:05:20 | INFO  | Model size  : 0.2354 MB
+2026-05-10 13:05:20 | INFO  | [Building model] completed in 0.00s
+2026-05-10 13:05:22 | INFO  | [Epoch 1] completed in 2.30s
+2026-05-10 13:05:22 | INFO  | Epoch   1/15 | Train loss: 0.3132  acc: 0.9057 | Val loss: 0.1062  acc: 0.9652 | Time: 2.3s
+2026-05-10 13:05:22 | INFO  |   ✓ New best val acc: 0.9652 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:25 | INFO  | [Epoch 2] completed in 2.36s
+2026-05-10 13:05:25 | INFO  | Epoch   2/15 | Train loss: 0.0889  acc: 0.9720 | Val loss: 0.0699  acc: 0.9773 | Time: 2.4s
+2026-05-10 13:05:25 | INFO  |   ✓ New best val acc: 0.9773 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:27 | INFO  | [Epoch 3] completed in 2.31s
+2026-05-10 13:05:27 | INFO  | Epoch   3/15 | Train loss: 0.0627  acc: 0.9800 | Val loss: 0.0565  acc: 0.9802 | Time: 2.3s
+2026-05-10 13:05:27 | INFO  |   ✓ New best val acc: 0.9802 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:29 | INFO  | [Epoch 4] completed in 2.31s
+2026-05-10 13:05:29 | INFO  | Epoch   4/15 | Train loss: 0.0495  acc: 0.9836 | Val loss: 0.0524  acc: 0.9840 | Time: 2.3s
+2026-05-10 13:05:29 | INFO  |   ✓ New best val acc: 0.9840 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:32 | INFO  | [Epoch 5] completed in 2.29s
+2026-05-10 13:05:32 | INFO  | Epoch   5/15 | Train loss: 0.0413  acc: 0.9867 | Val loss: 0.0442  acc: 0.9865 | Time: 2.3s
+2026-05-10 13:05:32 | INFO  |   ✓ New best val acc: 0.9865 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:34 | INFO  | [Epoch 6] completed in 2.33s
+2026-05-10 13:05:34 | INFO  | Epoch   6/15 | Train loss: 0.0326  acc: 0.9895 | Val loss: 0.0563  acc: 0.9820 | Time: 2.3s
+2026-05-10 13:05:36 | INFO  | [Epoch 7] completed in 2.34s
+2026-05-10 13:05:36 | INFO  | Epoch   7/15 | Train loss: 0.0280  acc: 0.9910 | Val loss: 0.0492  acc: 0.9848 | Time: 2.3s
+2026-05-10 13:05:39 | INFO  | [Epoch 8] completed in 2.32s
+2026-05-10 13:05:39 | INFO  | Epoch   8/15 | Train loss: 0.0251  acc: 0.9922 | Val loss: 0.0506  acc: 0.9843 | Time: 2.3s
+2026-05-10 13:05:41 | INFO  | [Epoch 9] completed in 2.30s
+2026-05-10 13:05:41 | INFO  | Epoch   9/15 | Train loss: 0.0201  acc: 0.9934 | Val loss: 0.0474  acc: 0.9867 | Time: 2.3s
+2026-05-10 13:05:41 | INFO  |   ✓ New best val acc: 0.9867 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:43 | INFO  | [Epoch 10] completed in 2.35s
+2026-05-10 13:05:43 | INFO  | Epoch  10/15 | Train loss: 0.0190  acc: 0.9938 | Val loss: 0.0500  acc: 0.9875 | Time: 2.3s
+2026-05-10 13:05:43 | INFO  |   ✓ New best val acc: 0.9875 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:46 | INFO  | [Epoch 11] completed in 2.25s
+2026-05-10 13:05:46 | INFO  | Epoch  11/15 | Train loss: 0.0160  acc: 0.9945 | Val loss: 0.0439  acc: 0.9877 | Time: 2.2s
+2026-05-10 13:05:46 | INFO  |   ✓ New best val acc: 0.9877 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:48 | INFO  | [Epoch 12] completed in 2.30s
+2026-05-10 13:05:48 | INFO  | Epoch  12/15 | Train loss: 0.0153  acc: 0.9951 | Val loss: 0.0419  acc: 0.9888 | Time: 2.3s
+2026-05-10 13:05:48 | INFO  |   ✓ New best val acc: 0.9888 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:50 | INFO  | [Epoch 13] completed in 2.36s
+2026-05-10 13:05:50 | INFO  | Epoch  13/15 | Train loss: 0.0137  acc: 0.9953 | Val loss: 0.0486  acc: 0.9883 | Time: 2.4s
+2026-05-10 13:05:53 | INFO  | [Epoch 14] completed in 2.33s
+2026-05-10 13:05:53 | INFO  | Epoch  14/15 | Train loss: 0.0114  acc: 0.9963 | Val loss: 0.0417  acc: 0.9892 | Time: 2.3s
+2026-05-10 13:05:53 | INFO  |   ✓ New best val acc: 0.9892 — checkpoint saved → lenet_relu_avgpool_best.pth
+2026-05-10 13:05:55 | INFO  | [Epoch 15] completed in 2.27s
+2026-05-10 13:05:55 | INFO  | Epoch  15/15 | Train loss: 0.0120  acc: 0.9961 | Val loss: 0.0494  acc: 0.9877 | Time: 2.3s
+2026-05-10 13:05:55 | INFO  | [Total training for lenet_relu_avgpool] completed in 34.73s
+2026-05-10 13:05:55 | INFO  | Loaded best checkpoint (val acc: 0.9892, epoch 14)
+2026-05-10 13:05:55 | INFO  | [Final test evaluation] completed in 0.46s
+2026-05-10 13:05:55 | INFO  | Final test accuracy: 0.9880  (98.80%)

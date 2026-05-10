@@ -1,0 +1,70 @@
+2026-05-10 13:02:57 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/lenet_tanh_avgpool.log
+2026-05-10 13:02:57 | INFO  | ============================================================
+2026-05-10 13:02:57 | INFO  |   EXPERIMENT: lenet_tanh_avgpool
+2026-05-10 13:02:57 | INFO  |   Activation : tanh
+2026-05-10 13:02:57 | INFO  |   Pooling    : avg
+2026-05-10 13:02:57 | INFO  |   Epochs     : 1
+2026-05-10 13:02:57 | INFO  |   Device     : cuda
+2026-05-10 13:02:57 | INFO  | ============================================================
+2026-05-10 13:02:57 | INFO  | Parameters  : 61,706
+2026-05-10 13:02:57 | INFO  | Model size  : 0.2354 MB
+2026-05-10 13:02:57 | INFO  | [Building model] completed in 0.00s
+2026-05-10 13:02:57 | INFO  | [Epoch 1] completed in 0.14s
+2026-05-10 13:02:57 | INFO  | Epoch   1/1 | Train loss: 2.3145  acc: 0.0312 | Val loss: 2.2513  acc: 0.3125 | Time: 0.1s
+2026-05-10 13:02:57 | INFO  | Dry-run mode: stopping after first epoch.
+2026-05-10 13:02:57 | INFO  | [Total training for lenet_tanh_avgpool] completed in 0.14s
+2026-05-10 13:02:57 | INFO  | [Final test evaluation] completed in 0.06s
+2026-05-10 13:02:57 | INFO  | Final test accuracy: 0.2656  (26.56%)
+2026-05-10 13:06:30 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/lenet_tanh_avgpool.log
+2026-05-10 13:06:30 | INFO  | ============================================================
+2026-05-10 13:06:30 | INFO  |   EXPERIMENT: lenet_tanh_avgpool
+2026-05-10 13:06:30 | INFO  |   Activation : tanh
+2026-05-10 13:06:30 | INFO  |   Pooling    : avg
+2026-05-10 13:06:30 | INFO  |   Epochs     : 15
+2026-05-10 13:06:30 | INFO  |   Device     : cuda
+2026-05-10 13:06:30 | INFO  | ============================================================
+2026-05-10 13:06:30 | INFO  | Parameters  : 61,706
+2026-05-10 13:06:30 | INFO  | Model size  : 0.2354 MB
+2026-05-10 13:06:30 | INFO  | [Building model] completed in 0.00s
+2026-05-10 13:06:33 | INFO  | [Epoch 1] completed in 2.29s
+2026-05-10 13:06:33 | INFO  | Epoch   1/15 | Train loss: 0.2736  acc: 0.9215 | Val loss: 0.1023  acc: 0.9667 | Time: 2.3s
+2026-05-10 13:06:33 | INFO  |   ✓ New best val acc: 0.9667 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:06:35 | INFO  | [Epoch 2] completed in 2.32s
+2026-05-10 13:06:35 | INFO  | Epoch   2/15 | Train loss: 0.0765  acc: 0.9769 | Val loss: 0.0772  acc: 0.9782 | Time: 2.3s
+2026-05-10 13:06:35 | INFO  |   ✓ New best val acc: 0.9782 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:06:37 | INFO  | [Epoch 3] completed in 2.28s
+2026-05-10 13:06:37 | INFO  | Epoch   3/15 | Train loss: 0.0513  acc: 0.9845 | Val loss: 0.0526  acc: 0.9842 | Time: 2.3s
+2026-05-10 13:06:37 | INFO  |   ✓ New best val acc: 0.9842 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:06:40 | INFO  | [Epoch 4] completed in 2.30s
+2026-05-10 13:06:40 | INFO  | Epoch   4/15 | Train loss: 0.0399  acc: 0.9881 | Val loss: 0.0535  acc: 0.9842 | Time: 2.3s
+2026-05-10 13:06:42 | INFO  | [Epoch 5] completed in 2.38s
+2026-05-10 13:06:42 | INFO  | Epoch   5/15 | Train loss: 0.0325  acc: 0.9896 | Val loss: 0.0480  acc: 0.9857 | Time: 2.4s
+2026-05-10 13:06:42 | INFO  |   ✓ New best val acc: 0.9857 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:06:44 | INFO  | [Epoch 6] completed in 2.37s
+2026-05-10 13:06:44 | INFO  | Epoch   6/15 | Train loss: 0.0276  acc: 0.9908 | Val loss: 0.0442  acc: 0.9872 | Time: 2.4s
+2026-05-10 13:06:44 | INFO  |   ✓ New best val acc: 0.9872 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:06:47 | INFO  | [Epoch 7] completed in 2.36s
+2026-05-10 13:06:47 | INFO  | Epoch   7/15 | Train loss: 0.0221  acc: 0.9928 | Val loss: 0.0492  acc: 0.9863 | Time: 2.4s
+2026-05-10 13:06:49 | INFO  | [Epoch 8] completed in 2.31s
+2026-05-10 13:06:49 | INFO  | Epoch   8/15 | Train loss: 0.0194  acc: 0.9935 | Val loss: 0.0641  acc: 0.9818 | Time: 2.3s
+2026-05-10 13:06:51 | INFO  | [Epoch 9] completed in 2.35s
+2026-05-10 13:06:51 | INFO  | Epoch   9/15 | Train loss: 0.0158  acc: 0.9950 | Val loss: 0.0554  acc: 0.9842 | Time: 2.3s
+2026-05-10 13:06:54 | INFO  | [Epoch 10] completed in 2.27s
+2026-05-10 13:06:54 | INFO  | Epoch  10/15 | Train loss: 0.0133  acc: 0.9959 | Val loss: 0.0538  acc: 0.9875 | Time: 2.3s
+2026-05-10 13:06:54 | INFO  |   ✓ New best val acc: 0.9875 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:06:56 | INFO  | [Epoch 11] completed in 2.36s
+2026-05-10 13:06:56 | INFO  | Epoch  11/15 | Train loss: 0.0129  acc: 0.9959 | Val loss: 0.0541  acc: 0.9855 | Time: 2.4s
+2026-05-10 13:06:58 | INFO  | [Epoch 12] completed in 2.31s
+2026-05-10 13:06:58 | INFO  | Epoch  12/15 | Train loss: 0.0117  acc: 0.9964 | Val loss: 0.0474  acc: 0.9883 | Time: 2.3s
+2026-05-10 13:06:58 | INFO  |   ✓ New best val acc: 0.9883 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:07:01 | INFO  | [Epoch 13] completed in 2.31s
+2026-05-10 13:07:01 | INFO  | Epoch  13/15 | Train loss: 0.0111  acc: 0.9962 | Val loss: 0.0466  acc: 0.9882 | Time: 2.3s
+2026-05-10 13:07:03 | INFO  | [Epoch 14] completed in 2.33s
+2026-05-10 13:07:03 | INFO  | Epoch  14/15 | Train loss: 0.0110  acc: 0.9961 | Val loss: 0.0534  acc: 0.9872 | Time: 2.3s
+2026-05-10 13:07:05 | INFO  | [Epoch 15] completed in 2.26s
+2026-05-10 13:07:05 | INFO  | Epoch  15/15 | Train loss: 0.0079  acc: 0.9977 | Val loss: 0.0531  acc: 0.9887 | Time: 2.3s
+2026-05-10 13:07:05 | INFO  |   ✓ New best val acc: 0.9887 — checkpoint saved → lenet_tanh_avgpool_best.pth
+2026-05-10 13:07:05 | INFO  | [Total training for lenet_tanh_avgpool] completed in 34.79s
+2026-05-10 13:07:05 | INFO  | Loaded best checkpoint (val acc: 0.9887, epoch 15)
+2026-05-10 13:07:06 | INFO  | [Final test evaluation] completed in 0.47s
+2026-05-10 13:07:06 | INFO  | Final test accuracy: 0.9870  (98.70%)

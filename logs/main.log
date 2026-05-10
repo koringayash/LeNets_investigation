@@ -1,0 +1,164 @@
+2026-05-10 13:02:24 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/main.log
+2026-05-10 13:02:24 | INFO  | 
+============================================================
+  SYSTEM INFORMATION
+============================================================
+  OS          : Linux 6.8.0-111-generic
+  Python      : 3.10.12
+  PyTorch     : 2.6.0+cu124
+  Device      : CUDA 12.4 | GPU: NVIDIA RTX A4500 | VRAM: 21.0 GB
+============================================================
+2026-05-10 13:02:24 | INFO  | Checking / downloading MNIST training set …
+2026-05-10 13:02:56 | INFO  | [Downloading MNIST (train split)] completed in 31.74s
+2026-05-10 13:02:56 | INFO  | Checking / downloading MNIST test set …
+2026-05-10 13:02:56 | INFO  | [Downloading MNIST (test split)] completed in 0.01s
+2026-05-10 13:02:56 | INFO  | MNIST data ready at: /home/pe1/CV_Pro/CV_LeNets/Data
+2026-05-10 13:02:56 | INFO  | [Loading MNIST from disk] completed in 0.04s
+2026-05-10 13:02:56 | INFO  | Split sizes — train: 48,000  val: 6,000  test: 10,000
+2026-05-10 13:02:56 | INFO  | [Splitting dataset] completed in 0.00s
+2026-05-10 13:02:56 | INFO  | [Creating DataLoaders] completed in 0.00s
+2026-05-10 13:02:56 | INFO  | 
+============================================================
+  Dataset Summary: MNIST
+============================================================
+  Train batches : 750    |  samples : 48,000
+  Val   batches : 94     |  samples : 6,000
+  Test  batches : 157    |  samples : 10,000
+  Image shape   : (1, 32, 32)
+  Num classes   : 10
+============================================================
+2026-05-10 13:02:56 | INFO  | [Data preparation] completed in 31.94s
+2026-05-10 13:02:56 | INFO  | Running 8 experiment(s) | 1 epoch(s) each | device: cuda | DRY RUN
+2026-05-10 13:02:56 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 1/8: lenet_relu_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:56 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 2/8: lenet_sigmoid_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:56 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 3/8: lenet_tanh_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:57 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 4/8: lenet_leakyrelu_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:57 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 5/8: lenet_relu_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:57 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 6/8: lenet_sigmoid_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:57 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 7/8: lenet_tanh_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:57 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 8/8: lenet_leakyrelu_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:02:58 | INFO  | [All experiments combined] completed in 1.71s
+2026-05-10 13:02:58 | INFO  | 
+============================================================
+  EMPIRICAL STUDY RESULTS
+============================================================
+  Rank  Experiment                           Val Acc  Test Acc
+------------------------------------------------------------
+  1     lenet_tanh_avgpool                   0.0000    0.2656
+  2     lenet_leakyrelu_avgpool              0.0000    0.1719
+  3     lenet_sigmoid_avgpool                0.0000    0.1562
+  4     lenet_relu_maxpool                   0.0000    0.1406
+  5     lenet_tanh_maxpool                   0.0000    0.1094
+  6     lenet_relu_avgpool                   0.0000    0.1094
+  7     lenet_leakyrelu_maxpool              0.0000    0.0938
+  8     lenet_sigmoid_maxpool                0.0000    0.0781
+============================================================
+  Results CSV → /home/pe1/CV_Pro/CV_LeNets/logs/results.csv
+============================================================
+
+2026-05-10 13:02:59 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/main.log
+2026-05-10 13:02:59 | INFO  | 
+============================================================
+  SYSTEM INFORMATION
+============================================================
+  OS          : Linux 6.8.0-111-generic
+  Python      : 3.10.12
+  PyTorch     : 2.6.0+cu124
+  Device      : CUDA 12.4 | GPU: NVIDIA RTX A4500 | VRAM: 21.0 GB
+============================================================
+2026-05-10 13:02:59 | INFO  | Checking / downloading MNIST training set …
+2026-05-10 13:02:59 | INFO  | [Downloading MNIST (train split)] completed in 0.04s
+2026-05-10 13:02:59 | INFO  | Checking / downloading MNIST test set …
+2026-05-10 13:02:59 | INFO  | [Downloading MNIST (test split)] completed in 0.01s
+2026-05-10 13:02:59 | INFO  | MNIST data ready at: /home/pe1/CV_Pro/CV_LeNets/Data
+2026-05-10 13:02:59 | INFO  | [Loading MNIST from disk] completed in 0.04s
+2026-05-10 13:02:59 | INFO  | Split sizes — train: 48,000  val: 6,000  test: 10,000
+2026-05-10 13:02:59 | INFO  | [Splitting dataset] completed in 0.00s
+2026-05-10 13:02:59 | INFO  | [Creating DataLoaders] completed in 0.00s
+2026-05-10 13:02:59 | INFO  | 
+============================================================
+  Dataset Summary: MNIST
+============================================================
+  Train batches : 750    |  samples : 48,000
+  Val   batches : 94     |  samples : 6,000
+  Test  batches : 157    |  samples : 10,000
+  Image shape   : (1, 32, 32)
+  Num classes   : 10
+============================================================
+2026-05-10 13:02:59 | INFO  | [Data preparation] completed in 0.20s
+2026-05-10 13:02:59 | INFO  | Running 8 experiment(s) | 15 epoch(s) each | device: cuda
+2026-05-10 13:02:59 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 1/8: lenet_relu_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:03:35 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 2/8: lenet_sigmoid_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:04:10 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 3/8: lenet_tanh_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:04:45 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 4/8: lenet_leakyrelu_maxpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:05:20 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 5/8: lenet_relu_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:05:55 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 6/8: lenet_sigmoid_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:06:30 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 7/8: lenet_tanh_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:07:06 | INFO  | 
+────────────────────────────────────────────────────────────
+  Experiment 8/8: lenet_leakyrelu_avgpool
+────────────────────────────────────────────────────────────
+2026-05-10 13:07:41 | INFO  | [All experiments combined] completed in 281.57s
+2026-05-10 13:07:41 | INFO  | 
+============================================================
+  EMPIRICAL STUDY RESULTS
+============================================================
+  Rank  Experiment                           Val Acc  Test Acc
+------------------------------------------------------------
+  1     lenet_leakyrelu_maxpool              0.9913    0.9908
+  2     lenet_leakyrelu_avgpool              0.9910    0.9906
+  3     lenet_tanh_maxpool                   0.9902    0.9890
+  4     lenet_relu_avgpool                   0.9892    0.9880
+  5     lenet_relu_maxpool                   0.9895    0.9876
+  6     lenet_tanh_avgpool                   0.9887    0.9870
+  7     lenet_sigmoid_maxpool                0.9868    0.9869
+  8     lenet_sigmoid_avgpool                0.9853    0.9852
+============================================================
+  Results CSV → /home/pe1/CV_Pro/CV_LeNets/logs/results.csv
+============================================================
+

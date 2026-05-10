@@ -1,0 +1,72 @@
+2026-05-10 13:02:56 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/lenet_sigmoid_maxpool.log
+2026-05-10 13:02:56 | INFO  | ============================================================
+2026-05-10 13:02:56 | INFO  |   EXPERIMENT: lenet_sigmoid_maxpool
+2026-05-10 13:02:56 | INFO  |   Activation : sigmoid
+2026-05-10 13:02:56 | INFO  |   Pooling    : max
+2026-05-10 13:02:56 | INFO  |   Epochs     : 1
+2026-05-10 13:02:56 | INFO  |   Device     : cuda
+2026-05-10 13:02:56 | INFO  | ============================================================
+2026-05-10 13:02:56 | INFO  | Parameters  : 61,706
+2026-05-10 13:02:56 | INFO  | Model size  : 0.2354 MB
+2026-05-10 13:02:56 | INFO  | [Building model] completed in 0.00s
+2026-05-10 13:02:56 | INFO  | [Epoch 1] completed in 0.13s
+2026-05-10 13:02:56 | INFO  | Epoch   1/1 | Train loss: 2.3762  acc: 0.1094 | Val loss: 2.2910  acc: 0.1094 | Time: 0.1s
+2026-05-10 13:02:56 | INFO  | Dry-run mode: stopping after first epoch.
+2026-05-10 13:02:56 | INFO  | [Total training for lenet_sigmoid_maxpool] completed in 0.13s
+2026-05-10 13:02:56 | INFO  | [Final test evaluation] completed in 0.06s
+2026-05-10 13:02:56 | INFO  | Final test accuracy: 0.0781  (7.81%)
+2026-05-10 13:03:35 | INFO  | Logger initialised → /home/pe1/CV_Pro/CV_LeNets/logs/lenet_sigmoid_maxpool.log
+2026-05-10 13:03:35 | INFO  | ============================================================
+2026-05-10 13:03:35 | INFO  |   EXPERIMENT: lenet_sigmoid_maxpool
+2026-05-10 13:03:35 | INFO  |   Activation : sigmoid
+2026-05-10 13:03:35 | INFO  |   Pooling    : max
+2026-05-10 13:03:35 | INFO  |   Epochs     : 15
+2026-05-10 13:03:35 | INFO  |   Device     : cuda
+2026-05-10 13:03:35 | INFO  | ============================================================
+2026-05-10 13:03:35 | INFO  | Parameters  : 61,706
+2026-05-10 13:03:35 | INFO  | Model size  : 0.2354 MB
+2026-05-10 13:03:35 | INFO  | [Building model] completed in 0.00s
+2026-05-10 13:03:37 | INFO  | [Epoch 1] completed in 2.28s
+2026-05-10 13:03:37 | INFO  | Epoch   1/15 | Train loss: 0.9319  acc: 0.7132 | Val loss: 0.2683  acc: 0.9267 | Time: 2.3s
+2026-05-10 13:03:37 | INFO  |   ✓ New best val acc: 0.9267 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:39 | INFO  | [Epoch 2] completed in 2.29s
+2026-05-10 13:03:39 | INFO  | Epoch   2/15 | Train loss: 0.1799  acc: 0.9503 | Val loss: 0.1541  acc: 0.9530 | Time: 2.3s
+2026-05-10 13:03:39 | INFO  |   ✓ New best val acc: 0.9530 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:42 | INFO  | [Epoch 3] completed in 2.40s
+2026-05-10 13:03:42 | INFO  | Epoch   3/15 | Train loss: 0.1141  acc: 0.9664 | Val loss: 0.1003  acc: 0.9695 | Time: 2.4s
+2026-05-10 13:03:42 | INFO  |   ✓ New best val acc: 0.9695 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:44 | INFO  | [Epoch 4] completed in 2.28s
+2026-05-10 13:03:44 | INFO  | Epoch   4/15 | Train loss: 0.0867  acc: 0.9742 | Val loss: 0.0813  acc: 0.9743 | Time: 2.3s
+2026-05-10 13:03:44 | INFO  |   ✓ New best val acc: 0.9743 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:46 | INFO  | [Epoch 5] completed in 2.31s
+2026-05-10 13:03:46 | INFO  | Epoch   5/15 | Train loss: 0.0704  acc: 0.9786 | Val loss: 0.0753  acc: 0.9762 | Time: 2.3s
+2026-05-10 13:03:46 | INFO  |   ✓ New best val acc: 0.9762 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:49 | INFO  | [Epoch 6] completed in 2.27s
+2026-05-10 13:03:49 | INFO  | Epoch   6/15 | Train loss: 0.0597  acc: 0.9815 | Val loss: 0.0740  acc: 0.9772 | Time: 2.3s
+2026-05-10 13:03:49 | INFO  |   ✓ New best val acc: 0.9772 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:51 | INFO  | [Epoch 7] completed in 2.32s
+2026-05-10 13:03:51 | INFO  | Epoch   7/15 | Train loss: 0.0519  acc: 0.9838 | Val loss: 0.0622  acc: 0.9800 | Time: 2.3s
+2026-05-10 13:03:51 | INFO  |   ✓ New best val acc: 0.9800 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:53 | INFO  | [Epoch 8] completed in 2.27s
+2026-05-10 13:03:53 | INFO  | Epoch   8/15 | Train loss: 0.0456  acc: 0.9861 | Val loss: 0.0540  acc: 0.9840 | Time: 2.3s
+2026-05-10 13:03:53 | INFO  |   ✓ New best val acc: 0.9840 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:03:55 | INFO  | [Epoch 9] completed in 2.30s
+2026-05-10 13:03:55 | INFO  | Epoch   9/15 | Train loss: 0.0416  acc: 0.9871 | Val loss: 0.0562  acc: 0.9830 | Time: 2.3s
+2026-05-10 13:03:58 | INFO  | [Epoch 10] completed in 2.33s
+2026-05-10 13:03:58 | INFO  | Epoch  10/15 | Train loss: 0.0352  acc: 0.9893 | Val loss: 0.0567  acc: 0.9820 | Time: 2.3s
+2026-05-10 13:04:00 | INFO  | [Epoch 11] completed in 2.30s
+2026-05-10 13:04:00 | INFO  | Epoch  11/15 | Train loss: 0.0332  acc: 0.9896 | Val loss: 0.0485  acc: 0.9848 | Time: 2.3s
+2026-05-10 13:04:00 | INFO  |   ✓ New best val acc: 0.9848 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:04:02 | INFO  | [Epoch 12] completed in 2.30s
+2026-05-10 13:04:02 | INFO  | Epoch  12/15 | Train loss: 0.0304  acc: 0.9908 | Val loss: 0.0557  acc: 0.9832 | Time: 2.3s
+2026-05-10 13:04:05 | INFO  | [Epoch 13] completed in 2.30s
+2026-05-10 13:04:05 | INFO  | Epoch  13/15 | Train loss: 0.0265  acc: 0.9917 | Val loss: 0.0436  acc: 0.9868 | Time: 2.3s
+2026-05-10 13:04:05 | INFO  |   ✓ New best val acc: 0.9868 — checkpoint saved → lenet_sigmoid_maxpool_best.pth
+2026-05-10 13:04:07 | INFO  | [Epoch 14] completed in 2.28s
+2026-05-10 13:04:07 | INFO  | Epoch  14/15 | Train loss: 0.0245  acc: 0.9921 | Val loss: 0.0468  acc: 0.9863 | Time: 2.3s
+2026-05-10 13:04:09 | INFO  | [Epoch 15] completed in 2.27s
+2026-05-10 13:04:09 | INFO  | Epoch  15/15 | Train loss: 0.0214  acc: 0.9937 | Val loss: 0.0467  acc: 0.9852 | Time: 2.3s
+2026-05-10 13:04:09 | INFO  | [Total training for lenet_sigmoid_maxpool] completed in 34.49s
+2026-05-10 13:04:09 | INFO  | Loaded best checkpoint (val acc: 0.9868, epoch 13)
+2026-05-10 13:04:10 | INFO  | [Final test evaluation] completed in 0.46s
+2026-05-10 13:04:10 | INFO  | Final test accuracy: 0.9869  (98.69%)
