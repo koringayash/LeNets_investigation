@@ -41,7 +41,7 @@ lenet_study/
 ### 1 — Clone and install
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/koringayash/LeNets_investigation.git
 cd lenet_study
 pip install -r requirements.txt
 ```
@@ -198,22 +198,46 @@ Training loss decreases smoothly for all 8 variants. Val loss stays close to tra
 
 ## Visualisations
 
-Generate all plots from your results CSV with one command:
+> Regenerate all plots any time with:
+> ```bash
+> python plot_results.py
+> ```
 
-```bash
-python plot_results.py                         # reads logs/results.csv by default
-python plot_results.py --csv logs/results.csv --out plots/
-```
+---
 
-This produces 5 PNG files in `plots/`:
+### Final Test Accuracy — Ranked
 
-| File | What it shows |
-|------|--------------|
-| `val_accuracy_curves.png` | Val accuracy over all 15 epochs for all 8 experiments |
-| `train_loss_curves.png` | Training loss over all 15 epochs — shows Sigmoid's slow start |
-| `final_test_accuracy.png` | Ranked bar chart of final test accuracy |
-| `activation_vs_pooling.png` | Grouped bars: MaxPool vs AvgPool per activation |
-| `convergence_speed.png` | Val accuracy at epoch 1 — shows which activation learns fastest |
+![Final Test Accuracy](plots/final_test_accuracy.png)
+
+---
+
+### Validation Accuracy over Epochs
+
+![Validation Accuracy Curves](plots/val_accuracy_curves.png)
+
+> Solid lines = MaxPool · Dashed lines = AvgPool
+
+---
+
+### Training Loss over Epochs
+
+![Training Loss Curves](plots/train_loss_curves.png)
+
+> Note the high epoch-1 loss for Sigmoid variants (~1.0) vs all others (~0.25) — a clear sign of slow convergence due to gradient saturation.
+
+---
+
+### Activation Function × Pooling Type
+
+![Activation vs Pooling](plots/activation_vs_pooling.png)
+
+---
+
+### Convergence Speed — Val Accuracy at Epoch 1
+
+![Convergence Speed](plots/convergence_speed.png)
+
+> Tanh and LeakyReLU learn the fastest. Sigmoid barely crosses 90% in epoch 1 while others are already above 96%.
 
 ---
 
