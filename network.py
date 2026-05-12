@@ -307,8 +307,7 @@ class CNNModel(nn.Module):
         Conv and Pool layers shrink H and W according to standard formulas.
         When we reach Flatten, we multiply C × H × W to get the exact
         in_features value and pass it to Linear. No dummy tensor needed here
-        (the dummy pass in _trace_shapes is only for recording output shapes
-        in the summary table).
+        (the dummy pass in _trace_shapes is only for recording output shapes in the summary table).
 
         Spatial output size formulas
         ----------------------------

@@ -1,179 +1,199 @@
 """
 config.py
 ---------
-Single source of truth for the entire project.
+Single source of truth for the entire CV framework.
 
-Every path, hyperparameter, and experiment variant is defined here.
-No other file should contain hardcoded values — they all import from this module.
+This is the ONLY file a user needs to edit to run a completely
+different experiment — different dataset, different model, different
+hyperparameters, different evaluation metrics.
 
-Beginners: If you want to change the number of epochs, batch size, learning
-rate, or add a new experiment variant, THIS is the only file you need to edit.
+How to use this file
+--------------------
+1. Set EXPERIMENT["name"] to something descriptive.
+2. Set DATASET["source"] and fill in the matching fields.
+3. Set MODEL["type"] and either MODEL["name"] (predefined) or
+   MODEL["layer_configs"] (custom).
+4. Adjust TRAIN hyperparameters as needed.
+5. Run: python main.py
+
+Beginners: Think of this file as the control panel for the entire
+project. Every other file reads from here — nothing is hardcoded
+anywhere else.
 """
 
-import os
 from pathlib import Path
-from typing import Dict, Any, List
-
 
 # ---------------------------------------------------------------------------
-# Root paths  (all relative to the project directory)
+# Root paths
 # ---------------------------------------------------------------------------
 
-ROOT_DIR        = Path(__file__).parent.resolve()
-DATA_DIR        = ROOT_DIR / "Data"
-CHECKPOINT_DIR  = ROOT_DIR / "Checkpoint"
-LOG_DIR         = ROOT_DIR / "logs"
-RESULTS_CSV     = LOG_DIR  / "results.csv"
+ROOT_DIR       = Path(__file__).parent.resolve()
+DATA_DIR       = ROOT_DIR / "Data"
+CHECKPOINT_DIR = ROOT_DIR / "Checkpoint"
+LOG_DIR        = ROOT_DIR / "logs"
+PLOTS_DIR      = ROOT_DIR / "plots"
+STATE_FILE     = ROOT_DIR / "pipeline_state.json"
 
-# Create directories now so every module can assume they exist
-for _d in [DATA_DIR, CHECKPOINT_DIR, LOG_DIR]:
+for _d in [DATA_DIR, CHECKPOINT_DIR, LOG_DIR, PLOTS_DIR]:
     _d.mkdir(parents=True, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Experiment
+# ---------------------------------------------------------------------------
+
+EXPERIMENT = {
+    # A unique name for this run. Used to name checkpoints, logs, and plots.
+    # Change this every time you start a meaningfully different experiment
+    # so results don't overwrite each other.
+    "name"  : "mnist_lenet_relu_maxpool",
+
+    # Random seed for full reproducibility across runs.
+    # Any integer works — 42 is the project default.
+    "seed"  : 42,
+
+    # Which phases to run. Remove a phase name to skip it entirely.
+    # Order matters: dataset must come before training, training before evaluation.
+    "stages": ["dataset", "training", "evaluation"],
+}
 
 
 # ---------------------------------------------------------------------------
 # Dataset
 # ---------------------------------------------------------------------------
 
-DATASET: Dict[str, Any] = {
-    "name"          : "MNIST",
-    # MNIST images are 28×28 grayscale; LeNet expects 32×32, so we pad/resize.
-    "image_size"    : 32,          # final H and W fed into the network
-    "num_classes"   : 10,          # digits 0-9
-    "in_channels"   : 1,           # grayscale = 1 channel
-    # Normalization constants computed from the MNIST training set
-    "mean"          : (0.1307,),
-    "std"           : (0.3081,),
-    # Split fractions (applied to the official 60 000 training samples)
-    # The official 10 000 test samples are kept separate and only used ONCE
-    # at the very end to report final accuracy.
-    "train_fraction": 0.8,         # 48 000 samples for training
-    "val_fraction"  : 0.1,         # 6 000 samples for validation  (tune hyperparams)
-    # test_fraction is implicitly 0.1 (6 000 samples) — not used during training
+DATASET = {
+    # Where the data comes from. Choose ONE of:
+    #   "torchvision" → built-in datasets (MNIST, CIFAR10, etc.)
+    #   "local"       → a folder on your machine (ImageFolder format)
+    #   "url"         → direct link to a .zip or .tar.gz file
+    #   "github"      → a GitHub folder URL, release URL, or full repo URL
+    "source"         : "torchvision",
+
+    # ---- torchvision source fields ----------------------------------------
+    # Name of the torchvision dataset. Case-sensitive.
+    # Supported: "MNIST", "CIFAR10", "CIFAR100", "FashionMNIST", "SVHN"
+    "name"           : "MNIST",
+
+    # ---- local source fields ----------------------------------------------
+    # Absolute or relative path to your dataset folder.
+    # Expected structure: dataset_root/class_name/image.jpg
+    "local_path"     : None,
+
+    # ---- url / github source fields ---------------------------------------
+    # Direct URL to a zip/tar.gz file  OR  a GitHub folder/repo URL.
+    "url"            : None,
+
+    # ---- Common fields (all sources) -------------------------------------
+    # Final image size fed into the network (H and W, square images only).
+    "image_size"     : 32,
+
+    # Number of output classes.
+    "num_classes"    : 10,
+
+    # Number of colour channels: 1 = grayscale, 3 = RGB.
+    "in_channels"    : 1,
+
+    # Normalisation constants (mean and std per channel).
+    # MNIST defaults shown. For CIFAR-10 RGB use:
+    #   mean=(0.4914, 0.4822, 0.4465), std=(0.2470, 0.2435, 0.2616)
+    "mean"           : (0.1307,),
+    "std"            : (0.3081,),
+
+    # Fraction of the training split used for training (remainder → validation).
+    # The official test set is always kept separate.
+    "train_fraction" : 0.8,
+    "val_fraction"   : 0.1,
+    # Implicit: remaining 10% is a held-out portion (not used in training loop)
+
+    # Set True to apply random horizontal flip and random crop augmentation.
+    # Useful for CIFAR-10 and natural image datasets. Keep False for MNIST.
+    "augment"        : False,
 }
 
 
 # ---------------------------------------------------------------------------
-# Training hyperparameters
+# Model
 # ---------------------------------------------------------------------------
 
-TRAIN: Dict[str, Any] = {
-    "epochs"           : 15,
-    "batch_size"       : 64,
-    "learning_rate"    : 1e-3,
-    "optimizer"        : "adam",   # fixed to Adam per project spec
-    "weight_decay"     : 0.0,      # L2 regularisation; 0 = disabled
-    "num_workers"      : 2,        # parallel data-loading workers
-    "device"           : "auto",   # "auto" → GPU if available, else CPU
-    "save_best_only"   : True,     # only keep the checkpoint with best val accuracy
+MODEL = {
+    # "predefined" → use a standard architecture by name (see MODEL["name"])
+    # "custom"     → define your own architecture via MODEL["layer_configs"]
+    "type"         : "predefined",
+
+    # ---- Predefined model -------------------------------------------------
+    # Used when type = "predefined". Supported names:
+    #   "lenet5"    → LeNet-5  (LeCun 1998)
+    #   "alexnet"   → AlexNet  (Krizhevsky 2012) — expects image_size >= 64
+    #   "vgg11"     → VGG-11   (Simonyan 2014)   — expects image_size >= 32
+    #   "vgg16"     → VGG-16   (Simonyan 2014)   — expects image_size >= 32
+    #   "resnet18"  → ResNet-18 (He 2015)         — expects image_size >= 32
+    #   "resnet34"  → ResNet-34 (He 2015)         — expects image_size >= 32
+    "name"         : "lenet5",
+
+    # ---- Custom model (layer-config list) ---------------------------------
+    # Used when type = "custom".
+    # Each dict describes one layer. Supported types:
+    #
+    #   {"type": "conv",            "out_channels": 32, "kernel_size": 3,
+    #    "stride": 1, "padding": 1}
+    #
+    #   {"type": "pool",            "name": "max",  "kernel_size": 2, "stride": 2}
+    #   {"type": "pool",            "name": "avg",  "kernel_size": 2, "stride": 2}
+    #
+    #   {"type": "activation",      "name": "relu"}
+    #   {"type": "activation",      "name": "leakyrelu", "negative_slope": 0.01}
+    #   {"type": "activation",      "name": "tanh"}
+    #   {"type": "activation",      "name": "sigmoid"}
+    #
+    #   {"type": "batchnorm"}       # auto-selects BatchNorm2d or BatchNorm1d
+    #   {"type": "dropout",         "p": 0.5}
+    #   {"type": "flatten"}
+    #   {"type": "linear",          "out_features": 128}
+    #
+    #   {"type": "residual_block",  "out_channels": 64, "stride": 1,
+    #    "activation": "relu"}      # stride=2 for downsampling blocks
+    #
+    "layer_configs": None,
 }
 
 
 # ---------------------------------------------------------------------------
-# Experiment matrix
-# ---------------------------------------------------------------------------
-# Each dict defines ONE experiment run.
-# train.py iterates over this list and runs them sequentially.
-#
-# To add a new experiment, just append another dict here.
-# get_experiment_name() will auto-generate a unique run name from it.
+# Training
 # ---------------------------------------------------------------------------
 
-EXPERIMENTS: List[Dict[str, Any]] = [
-    {"activation": "relu",       "pooling": "max"},
-    {"activation": "sigmoid",    "pooling": "max"},
-    {"activation": "tanh",       "pooling": "max"},
-    {"activation": "leakyrelu",  "pooling": "max"},
-    {"activation": "relu",       "pooling": "avg"},
-    {"activation": "sigmoid",    "pooling": "avg"},
-    {"activation": "tanh",       "pooling": "avg"},
-    {"activation": "leakyrelu",  "pooling": "avg"},
-]
+TRAIN = {
+    "epochs"        : 15,
+    "batch_size"    : 64,
+    "learning_rate" : 1e-3,
 
+    # Optimiser. Currently supported: "adam", "sgd"
+    "optimizer"     : "adam",
 
-# ---------------------------------------------------------------------------
-# LeNet-5 layer factory
-# ---------------------------------------------------------------------------
+    # SGD-specific: momentum and weight decay (L2 regularisation)
+    "momentum"      : 0.9,
+    "weight_decay"  : 0.0,
 
-def build_lenet_config(activation: str, pooling: str) -> List[Dict[str, Any]]:
-    """
-    Return the layer-config list for a LeNet-5 variant.
+    # Number of parallel workers for data loading.
+    # Set to 0 on Windows if you hit multiprocessing errors.
+    "num_workers"   : 2,
 
-    LeNet-5 (LeCun et al., 1998) has the following structure:
-        Conv → Pool → Conv → Pool → Flatten → FC → FC → FC(output)
+    # "auto" → GPU if available, else CPU.
+    # Override with "cuda" or "cpu" to force a specific device.
+    "device"        : "auto",
 
-    This function injects the caller's choice of activation function and
-    pooling type so that every experiment shares the same topology and only
-    the activation / pooling differ.
-
-    Parameters
-    ----------
-    activation : str
-        One of: "relu", "sigmoid", "tanh", "leakyrelu"
-    pooling : str
-        One of: "max", "avg"
-
-    Returns
-    -------
-    list of dict
-        Ready to pass directly to CNNModel(layer_configs, input_shape).
-
-    Example
-    -------
-    >>> cfg = build_lenet_config("relu", "max")
-    >>> model = CNNModel(cfg, input_shape=(1, 32, 32))
-    """
-    act = {"type": "activation", "name": activation}
-    pool = {
-        "type"       : "pool",
-        "name"       : pooling,
-        "kernel_size": 2,
-        "stride"     : 2,
-    }
-
-    return [
-        # ---- Block 1: 1 → 6 feature maps, 32×32 → 28×28 → 14×14 ----------
-        {"type": "conv", "out_channels": 6,  "kernel_size": 5, "stride": 1, "padding": 0},
-        act,
-        pool,
-
-        # ---- Block 2: 6 → 16 feature maps, 14×14 → 10×10 → 5×5 -----------
-        {"type": "conv", "out_channels": 16, "kernel_size": 5, "stride": 1, "padding": 0},
-        act,
-        pool,
-
-        # ---- Classifier: flatten → 120 → 84 → 10 --------------------------
-        {"type": "flatten"},
-        {"type": "linear", "out_features": 120},
-        act,
-        {"type": "linear", "out_features": 84},
-        act,
-        {"type": "linear", "out_features": DATASET["num_classes"]},
-    ]
+    # Only keep the checkpoint with the highest validation accuracy.
+    # If False, every epoch's checkpoint is saved (uses more disk space).
+    "save_best_only": True,
+}
 
 
 # ---------------------------------------------------------------------------
-# Experiment name helper
+# Evaluation
 # ---------------------------------------------------------------------------
 
-def get_experiment_name(exp: Dict[str, Any]) -> str:
-    """
-    Build a clean, filesystem-safe string that uniquely identifies one
-    experiment configuration.
-
-    Parameters
-    ----------
-    exp : dict
-        One entry from the EXPERIMENTS list,
-        e.g. {"activation": "relu", "pooling": "max"}.
-
-    Returns
-    -------
-    str
-        e.g. "lenet_relu_maxpool"
-
-    Example
-    -------
-    >>> get_experiment_name({"activation": "relu", "pooling": "max"})
-    'lenet_relu_maxpool'
-    """
-    return f"lenet_{exp['activation']}_{exp['pooling']}pool"
+EVAL = {
+    # Which metrics to compute on the test set.
+    # All are macro-averaged across classes.
+    "metrics": ["accuracy", "precision", "recall", "f1", "confusion_matrix"],
+}

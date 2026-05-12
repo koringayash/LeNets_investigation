@@ -1,284 +1,188 @@
-# LeNet Empirical Study
+# CV Framework
 
-A clean, beginner-friendly PyTorch project for training LeNet-5 variants on MNIST and empirically comparing **activation functions** (ReLU, Sigmoid, Tanh, LeakyReLU) and **pooling strategies** (MaxPool vs AvgPool).
+A modular, configurable, and resumable deep learning pipeline for Computer Vision research.
+
+Train any standard or custom CNN architecture on any dataset — by editing **one file**: `config.py`.
 
 ---
 
-## What This Project Does
+## Features
 
-1. Builds a **config-driven CNN class** (`CNNModel`) — describe any architecture as a list of dicts, no boilerplate required.
-2. Trains **8 LeNet-5 variants** (4 activations × 2 pooling types), all with Adam optimiser.
-3. Logs every epoch's metrics to a **master CSV** for easy analysis.
-4. Saves the **best checkpoint** per experiment (by validation accuracy).
-5. Times every phase (download, preprocessing, each epoch) so bottlenecks are visible.
+- **Config-driven** — change model, dataset, hyperparameters in `config.py` only
+- **Resumable** — crash mid-training? `--resume` picks up from the exact epoch
+- **4 dataset sources** — torchvision, local folder, direct URL, GitHub
+- **6 standard architectures** — LeNet-5, AlexNet, VGG-11, VGG-16, ResNet-18, ResNet-34
+- **Custom architectures** — define any sequential or residual CNN as a list of dicts
+- **Full logging** — CSV + JSON metrics, per-phase log files, live tqdm bars
+- **Evaluation** — accuracy, precision, recall, F1 (macro), confusion matrix + plots
 
 ---
 
 ## Project Structure
 
 ```
-lenet_study/
-├── config.py          ← All hyperparameters and experiment definitions (edit me!)
-├── network.py         ← CNNModel class — the generic CNN builder
-├── dataset.py         ← Download, preprocess, and split MNIST
-├── train.py           ← Training loop, evaluation, CLI interface
-├── utils.py           ← Timer, Logger, SystemInfo, CSV helper
-├── Run.sh             ← One command to run the whole study
-├── requirements.txt   ← Python dependencies
+cv_framework/
+├── main.py                  ← master entry point
+├── config.py                ← edit this to configure your experiment
+├── pipeline_state.py        ← crash-safe resume state manager
+├── requirements.txt
+├── Run.sh
 │
-├── Data/              ← MNIST downloaded here automatically
-├── Checkpoint/        ← Best model weights saved here (one .pth per experiment)
-└── logs/
-    ├── main.log       ← Master log (shared across all experiments)
-    ├── lenet_relu_maxpool.log     ← One log file per experiment
-    └── results.csv    ← Master results table (all experiments, all epochs)
+├── utils/                   ← Timer, Logger, MetricWriter, SystemInfo, seed
+├── architectures/           ← CNNModel builder + LeNet/AlexNet/VGG/ResNet configs
+├── dataset/                 ← download, preprocess, save, info
+├── training/                ← model factory, training loop, checkpointing
+├── evaluation/              ← inference, metrics, plots
+│
+├── Data/                    ← raw + processed datasets (auto-created)
+├── Checkpoint/              ← model weights (auto-created)
+├── logs/                    ← log files + results.csv/json (auto-created)
+└── plots/                   ← generated PNGs (auto-created)
 ```
 
 ---
 
 ## Quick Start
 
-### 1 — Clone and install
-
 ```bash
-git clone https://github.com/koringayash/LeNets_investigation.git
-cd lenet_study
+git clone <your-repo-url> && cd cv_framework
 pip install -r requirements.txt
-```
-
-### 2 — Run everything
-
-```bash
 bash Run.sh
 ```
 
-This will:
-- Install dependencies
-- Do a 1-batch dry-run to verify the pipeline works
-- Train all 8 experiments and save results to `logs/results.csv`
+---
 
-### 3 — View results
+## Common Commands
 
 ```bash
-# Pretty-print the CSV in the terminal
-column -t -s, logs/results.csv
-
-# Or open it in Excel / LibreOffice / pandas
-```
-
----
-
-## Running Individual Experiments
-
-```bash
-# Single experiment (by name)
-python train.py --experiment lenet_relu_maxpool
-
-# Override epoch count
-python train.py --epochs 5
-
-# Sanity check — 1 batch, no checkpoint saved
-python train.py --dry-run
-
-# All options combined
-python train.py --experiment lenet_tanh_avgpool --epochs 20
-```
-
----
-
-## Adding a New Experiment
-
-Open `config.py` and append a dict to `EXPERIMENTS`:
-
-```python
-EXPERIMENTS = [
-    ...
-    {"activation": "leakyrelu", "pooling": "avg"},   # already there
-    {"activation": "sigmoid",   "pooling": "max"},   # new variant
-]
-```
-
-That's it. The next `python train.py` run will include your new experiment automatically.
-
----
-
-## Using the CNN Builder Class (network.py)
-
-`CNNModel` can build **any** sequential CNN from a list of layer-config dicts — not just LeNet. Here's how to use it directly:
-
-```python
-from network import CNNModel
-
-layer_configs = [
-    {"type": "conv",       "out_channels": 6,  "kernel_size": 5, "stride": 1, "padding": 0},
-    {"type": "activation", "name": "relu"},
-    {"type": "pool",       "name": "max",  "kernel_size": 2, "stride": 2},
-    {"type": "conv",       "out_channels": 16, "kernel_size": 5},
-    {"type": "activation", "name": "relu"},
-    {"type": "pool",       "name": "max",  "kernel_size": 2, "stride": 2},
-    {"type": "flatten"},
-    {"type": "linear",     "out_features": 120},
-    {"type": "activation", "name": "relu"},
-    {"type": "linear",     "out_features": 84},
-    {"type": "activation", "name": "relu"},
-    {"type": "linear",     "out_features": 10},
-]
-
-model = CNNModel(layer_configs, input_shape=(1, 32, 32))
-
-# Useful inspection methods:
-model.summary()                 # prints a table of layers + output shapes
-model.count_parameters()        # → 61706
-model.get_input_shape()         # → (1, 32, 32)
-model.get_output_shape()        # → (10,)
-model.get_layer_output_shapes() # → [(6,28,28), (6,14,14), ..., (10,)]
-model.model_size_mb()           # → 0.235 MB
-```
-
-### Supported Layer Types
-
-| Type         | Required keys                          | Optional keys                    |
-|--------------|----------------------------------------|----------------------------------|
-| `conv`       | `out_channels`, `kernel_size`          | `stride` (1), `padding` (0)      |
-| `pool`       | `name` (max/avg), `kernel_size`        | `stride` (=kernel_size)          |
-| `activation` | `name` (relu/sigmoid/tanh/leakyrelu)   | `negative_slope` (LeakyReLU)     |
-| `linear`     | `out_features`                         | —                                |
-| `dropout`    | `p`                                    | `spatial` (False)                |
-| `flatten`    | —                                      | —                                |
-| `batchnorm`  | —                                      | —                                |
-
----
-
-## Experiment Results
-
-Training setup: **15 epochs · batch size 64 · Adam (lr=1e-3) · MNIST 32×32**
-
-| Rank | Experiment               | Best Val Acc | Test Acc | Val Acc @ Ep.1 |
-|:----:|--------------------------|:------------:|:--------:|:--------------:|
-|  1   | lenet_**leakyrelu**_maxpool | 99.13%    | **99.08%** | 97.2%       |
-|  2   | lenet_**leakyrelu**_avgpool | 99.10%    | 99.06%   | 96.5%          |
-|  3   | lenet_**tanh**_maxpool      | 99.02%    | 98.90%   | **97.8%**      |
-|  4   | lenet_**relu**_avgpool      | 98.92%    | 98.80%   | 96.5%          |
-|  5   | lenet_**relu**_maxpool      | 98.95%    | 98.76%   | 97.0%          |
-|  6   | lenet_**tanh**_avgpool      | 98.87%    | 98.70%   | 96.7%          |
-|  7   | lenet_**sigmoid**_maxpool   | 98.68%    | 98.69%   | 92.7%          |
-|  8   | lenet_**sigmoid**_avgpool   | 98.53%    | 98.52%   | 90.2%          |
-
-**Gap between best and worst: 0.56 percentage points.**
-
----
-
-## Key Findings
-
-### 1. Activation Function matters more than Pooling type
-
-The top 2 and bottom 2 spots are decided entirely by the activation function, not pooling. LeakyReLU wins both its MaxPool and AvgPool variants; Sigmoid loses both of its variants.
-
-### 2. LeakyReLU is the best activation on this task
-
-LeakyReLU (MaxPool) achieves **99.08% test accuracy** — the highest of all 8 experiments. Its small negative slope (0.01) for negative inputs prevents the "dying ReLU" problem, which matters even for a shallow network like LeNet-5.
-
-### 3. Sigmoid is the worst activation — and the slowest to converge
-
-Sigmoid reaches only **90.2% val accuracy at epoch 1** (avgpool variant), compared to 97.8% for Tanh and 97.2% for LeakyReLU. The reason: sigmoid saturates for large/small inputs, causing gradients to near-zero ("vanishing gradient"), which slows learning especially in early epochs.
-
-### 4. Tanh converges fastest
-
-Tanh (MaxPool) achieves **97.8% val accuracy in epoch 1** — the highest convergence speed across all experiments. It reaches near-peak performance very early because its output is zero-centred (unlike Sigmoid which is biased toward positive values), leading to better gradient flow.
-
-### 5. MaxPool vs AvgPool: negligible difference (<0.15 pp)
-
-The pooling type accounts for at most 0.15 percentage points of difference within any activation group. For MNIST — a simple, clean dataset — both strategies extract sufficient spatial information. MaxPool has a slight edge for LeakyReLU and Sigmoid; AvgPool has a slight edge for ReLU.
-
-### 6. All experiments converge. No training instability observed.
-
-Training loss decreases smoothly for all 8 variants. Val loss stays close to training loss throughout (no severe overfitting), which is expected given MNIST's simplicity relative to LeNet's capacity.
-
----
-
-## Visualisations
-
-> Regenerate all plots any time with:
-> ```bash
-> python plot_results.py
-> ```
-
----
-
-### Final Test Accuracy — Ranked
-
-![Final Test Accuracy](plots/final_test_accuracy.png)
-
----
-
-### Validation Accuracy over Epochs
-
-![Validation Accuracy Curves](plots/val_accuracy_curves.png)
-
-> Solid lines = MaxPool · Dashed lines = AvgPool
-
----
-
-### Training Loss over Epochs
-
-![Training Loss Curves](plots/train_loss_curves.png)
-
-> Note the high epoch-1 loss for Sigmoid variants (~1.0) vs all others (~0.25) — a clear sign of slow convergence due to gradient saturation.
-
----
-
-### Activation Function × Pooling Type
-
-![Activation vs Pooling](plots/activation_vs_pooling.png)
-
----
-
-### Convergence Speed — Val Accuracy at Epoch 1
-
-![Convergence Speed](plots/convergence_speed.png)
-
-> Tanh and LeakyReLU learn the fastest. Sigmoid barely crosses 90% in epoch 1 while others are already above 96%.
-
----
-
-## Monitoring on a VM
-
-All output is mirrored to log files, so you can disconnect and reconnect freely.
-
-```bash
-# Follow the master log live
+# Full pipeline from scratch
+python main.py
+
+# Single stage only
+python main.py --stage dataset
+python main.py --stage training
+python main.py --stage evaluation
+
+# Resume after a crash
+python main.py --resume
+python main.py --stage training --resume
+
+# Override epochs without editing config
+python main.py --epochs 5
+
+# VM background run (safe to disconnect)
+nohup bash Run.sh > run.log 2>&1 &
 tail -f logs/main.log
-
-# Follow a specific experiment
-tail -f logs/lenet_relu_maxpool.log
-
-# Check which experiments have finished
-ls Checkpoint/
 ```
 
 ---
 
-## Hyperparameter Reference
+## Configuring an Experiment
 
-All defaults live in `config.py`. Key values:
+Open `config.py` — it is the only file you need to edit.
 
-| Parameter     | Default | Location              |
-|---------------|---------|-----------------------|
-| Epochs        | 15      | `TRAIN["epochs"]`     |
-| Batch size    | 64      | `TRAIN["batch_size"]` |
-| Learning rate | 1e-3    | `TRAIN["learning_rate"]` |
-| Image size    | 32×32   | `DATASET["image_size"]`  |
-| Train split   | 80%     | `DATASET["train_fraction"]` |
-| Val split     | 10%     | `DATASET["val_fraction"]`   |
+### Switch dataset
+
+```python
+# Built-in torchvision dataset
+DATASET = {"source": "torchvision", "name": "CIFAR10", "in_channels": 3,
+           "num_classes": 10, "image_size": 32, ...}
+
+# Local folder (ImageFolder format)
+DATASET = {"source": "local", "local_path": "/data/my_dataset", ...}
+
+# Direct URL to a zip file
+DATASET = {"source": "url", "url": "https://example.com/dataset.zip", ...}
+
+# GitHub folder or repo
+DATASET = {"source": "github", "url": "https://github.com/user/repo/tree/main/data", ...}
+```
+
+### Switch model
+
+```python
+# Standard architecture
+MODEL = {"type": "predefined", "name": "resnet18"}
+# Options: "lenet5", "alexnet", "vgg11", "vgg16", "resnet18", "resnet34"
+
+# Custom architecture (your own layer list)
+MODEL = {
+    "type": "custom",
+    "layer_configs": [
+        {"type": "conv",       "out_channels": 32, "kernel_size": 3, "padding": 1},
+        {"type": "batchnorm"},
+        {"type": "activation", "name": "relu"},
+        {"type": "pool",       "name": "max", "kernel_size": 2, "stride": 2},
+        {"type": "flatten"},
+        {"type": "linear",     "out_features": 10},
+    ]
+}
+```
+
+### Supported layer types for custom architectures
+
+| Type | Required keys | Optional keys |
+|---|---|---|
+| `conv` | `out_channels`, `kernel_size` | `stride` (1), `padding` (0) |
+| `pool` | `name` (max/avg), `kernel_size` | `stride` (=kernel_size) |
+| `activation` | `name` (relu/sigmoid/tanh/leakyrelu) | `negative_slope` |
+| `linear` | `out_features` | — |
+| `batchnorm` | — | — |
+| `dropout` | `p` | `spatial` (False) |
+| `flatten` | — | — |
+| `residual_block` | `out_channels` | `stride` (1), `activation` (relu) |
 
 ---
 
-## Requirements
+## Resume System
 
-- Python ≥ 3.9
-- PyTorch ≥ 2.0
-- torchvision ≥ 0.15
-- tqdm ≥ 4.65
-- numpy ≥ 1.24
+A `pipeline_state.json` file is written atomically after every completed stage and after every training epoch.
 
-GPU is optional — the project runs on CPU, just slower (~5× per epoch on MNIST).
+```json
+{
+  "experiment": "mnist_lenet5",
+  "stages": {
+    "dataset":    "done",
+    "training":   {"status": "in_progress", "last_epoch": 12, "total_epochs": 50},
+    "evaluation": "pending"
+  }
+}
+```
+
+Running `python main.py --resume` reads this file and:
+- Skips stages marked `done`
+- Resumes training from epoch 13 (loads `Checkpoint/latest.pth`)
+- Runs evaluation fresh when training completes
+
+Without `--resume`, the state file is always reset and all stages run fresh.
+
+---
+
+## Adding a New Architecture
+
+1. Create `architectures/mynet.py` with a `build_mynet_config(num_classes)` function
+2. Add one line to `architectures/__init__.py`:
+   ```python
+   from architectures.mynet import build_mynet_config
+   REGISTRY["mynet"] = build_mynet_config
+   ```
+3. Set `MODEL = {"type": "predefined", "name": "mynet"}` in `config.py`
+
+Nothing else needs to change.
+
+---
+
+## Output Files
+
+| File | Contents |
+|---|---|
+| `logs/results.csv` | Per-epoch metrics for all runs (Excel-friendly) |
+| `logs/results.json` | Same data in JSON (used by plots) |
+| `logs/eval_metrics.json` | Final test accuracy + confusion matrix |
+| `logs/*.log` | Per-phase log files with timestamps |
+| `Checkpoint/*_best.pth` | Best model weights (highest val accuracy) |
+| `Checkpoint/*_latest.pth` | Most recent epoch weights (for resume) |
+| `Checkpoint/training_manifest.json` | Handoff from training → evaluation |
+| `plots/val_accuracy_curves.png` | Val accuracy over epochs |
+| `plots/train_loss_curves.png` | Training loss over epochs |
+| `plots/confusion_matrix.png` | Test set confusion matrix heatmap |
