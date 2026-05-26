@@ -1,17 +1,12 @@
 """
-dataset/info.py
----------------
-Prints a human-readable summary of the loaded dataset splits.
-
-Useful for verifying that data is loaded correctly and that tensor
-shapes, class counts, and split sizes match expectations before
-starting a potentially long training run.
+dataset/info.py (v2)
+---------------------
+Task-aware dataset summary printer.
 """
 
 import logging
 from torch.utils.data import DataLoader
-
-from config import DATASET
+from config import DATASET, EXPERIMENT
 
 
 def print_dataset_summary(
@@ -21,42 +16,50 @@ def print_dataset_summary(
     logger       : logging.Logger = None,
 ) -> None:
     """
-    Print a summary table of the three dataset splits.
+    Print a human-readable summary of the three dataset splits.
+
+    Adapts output based on the current task (classification / detection /
+    segmentation) since the sample format differs per task.
 
     Parameters
     ----------
     train_loader, val_loader, test_loader : DataLoader
     logger : logging.Logger, optional
-
-    Example output
-    --------------
-    ============================================================
-      Dataset Summary: MNIST
-    ============================================================
-      Source        : torchvision
-      Train samples : 48,000   |  batches: 750
-      Val   samples :  6,000   |  batches:  94
-      Test  samples : 10,000   |  batches: 157
-      Image shape   : (1, 32, 32)
-      Num classes   : 10
-      Augmentation  : False
-    ============================================================
     """
-    log = logger.info if logger else print
+    log  = logger.info if logger else print
+    task = EXPERIMENT["task"]
 
-    # Peek at one batch to get real image shape
-    sample_images, _ = next(iter(train_loader))
-    img_shape        = tuple(sample_images.shape[1:])
+    # Peek at one batch to get sample shapes
+    batch = next(iter(train_loader))
+    images = batch[0]
+    img_shape = tuple(images.shape[1:])
+
+    # Build target info string per task
+    if task == "classification":
+        labels    = batch[1]
+        tgt_info  = f"Labels shape : {tuple(labels.shape)} (class indices)"
+    elif task == "detection":
+        targets   = batch[1]   # list of dicts
+        n_boxes   = sum(t["boxes"].shape[0] for t in targets)
+        tgt_info  = (f"Targets      : list of {len(targets)} dicts "
+                     f"(avg {n_boxes/len(targets):.1f} boxes/image)")
+    elif task == "segmentation":
+        masks     = batch[1]
+        tgt_info  = f"Masks shape  : {tuple(masks.shape)} (H×W class indices)"
+    else:
+        tgt_info  = "Unknown task"
 
     lines = [
         "=" * 60,
-        f"  Dataset Summary: {DATASET.get('name', 'Custom')}",
+        f"  Dataset Summary — Task: {task.upper()}",
         "=" * 60,
         f"  Source        : {DATASET['source']}",
-        f"  Train samples : {len(train_loader.dataset):>7,}   |  batches: {len(train_loader)}",
-        f"  Val   samples : {len(val_loader.dataset):>7,}   |  batches: {len(val_loader)}",
-        f"  Test  samples : {len(test_loader.dataset):>7,}   |  batches: {len(test_loader)}",
+        f"  Format        : {DATASET['format']}",
+        f"  Train samples : {len(train_loader.dataset):>7,}  |  batches: {len(train_loader)}",
+        f"  Val   samples : {len(val_loader.dataset):>7,}  |  batches: {len(val_loader)}",
+        f"  Test  samples : {len(test_loader.dataset):>7,}  |  batches: {len(test_loader)}",
         f"  Image shape   : {img_shape}",
+        f"  {tgt_info}",
         f"  Num classes   : {DATASET['num_classes']}",
         f"  Augmentation  : {DATASET.get('augment', False)}",
         "=" * 60,

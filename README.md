@@ -1,43 +1,76 @@
-# CV Framework
+# CV Framework v2
 
-A modular, configurable, and resumable deep learning pipeline for Computer Vision research.
-
-Train any standard or custom CNN architecture on any dataset — by editing **one file**: `config.py`.
+A modular, configurable, and resumable deep learning pipeline for three Computer Vision tasks — **Classification, Detection, and Segmentation** — all driven by a single `config.py` file.
 
 ---
 
 ## Features
 
-- **Config-driven** — change model, dataset, hyperparameters in `config.py` only
+- **Three tasks** — image classification, object detection, semantic segmentation
+- **Config-driven** — change task, model, dataset, hyperparameters in `config.py` only
 - **Resumable** — crash mid-training? `--resume` picks up from the exact epoch
-- **4 dataset sources** — torchvision, local folder, direct URL, GitHub
-- **6 standard architectures** — LeNet-5, AlexNet, VGG-11, VGG-16, ResNet-18, ResNet-34
-- **Custom architectures** — define any sequential or residual CNN as a list of dicts
+- **9 dataset formats** — 3 per task (see Dataset Formats below)
+- **12 architectures** — LeNet, AlexNet, VGG-11/16, ResNet-18/34, YOLOv1, SSD-MobileNet, Faster R-CNN, U-Net, FCN, DeepLab v3
+- **Task-aware losses** — CrossEntropy/Focal/LabelSmoothing | CIoU+Focal+BCE | BCE+Dice
+- **Task-aware metrics** — Accuracy/P/R/F1/CM | mAP@0.5:0.95+AR | mIoU+Dice+PixelAcc
 - **Full logging** — CSV + JSON metrics, per-phase log files, live tqdm bars
-- **Evaluation** — accuracy, precision, recall, F1 (macro), confusion matrix + plots
 
 ---
 
 ## Project Structure
 
 ```
-cv_framework/
-├── main.py                  ← master entry point
-├── config.py                ← edit this to configure your experiment
-├── pipeline_state.py        ← crash-safe resume state manager
+cv_framework_v2/
+│
+├── main.py                        ← master entry point
+├── config.py                      ← edit this to configure everything
+├── pipeline_state.py              ← crash-safe resume state manager
 ├── requirements.txt
 ├── Run.sh
 │
-├── utils/                   ← Timer, Logger, MetricWriter, SystemInfo, seed
-├── architectures/           ← CNNModel builder + LeNet/AlexNet/VGG/ResNet configs
-├── dataset/                 ← download, preprocess, save, info
-├── training/                ← model factory, training loop, checkpointing
-├── evaluation/              ← inference, metrics, plots
+├── utils/                         ← Timer, Logger, MetricWriter, seed, SystemInfo
+├── losses/                        ← classification_loss, detection_loss, segmentation_loss
 │
-├── Data/                    ← raw + processed datasets (auto-created)
-├── Checkpoint/              ← model weights (auto-created)
-├── logs/                    ← log files + results.csv/json (auto-created)
-└── plots/                   ← generated PNGs (auto-created)
+├── architectures/
+│   ├── base.py                    ← shared layer builders (all new v2 layers)
+│   ├── classifier.py              ← CNNModel (sequential classification)
+│   ├── segmentor.py               ← EncoderDecoderModel (U-Net style)
+│   ├── detector.py                ← DetectionModel (backbone+neck+head)
+│   ├── classification_configs.py  ← LeNet, AlexNet, VGG, ResNet builders
+│   ├── detection_configs.py       ← YOLOv1, SSD-MobileNet, Faster R-CNN builders
+│   └── segmentation_configs.py    ← U-Net, FCN, DeepLab v3 builders
+│
+├── dataset/
+│   ├── download.py                ← 4 source strategies (torchvision/local/url/github)
+│   ├── preprocess.py              ← task-aware loading + normalisation + split
+│   ├── save_dataset.py            ← .pt files + task-aware collate functions
+│   ├── info.py                    ← dataset summary printer
+│   ├── main.py                    ← dataset phase orchestrator
+│   └── formats/
+│       ├── classification_formats.py  ← ImageFolder | CSV | torchvision
+│       ├── detection_formats.py       ← YOLO txt | COCO JSON | Pascal VOC XML
+│       └── segmentation_formats.py    ← Image+Mask | COCO polygons | Cityscapes
+│
+├── training/
+│   ├── model_factory.py           ← task-aware model builder
+│   ├── task_loop.py               ← per-task forward pass + loss functions
+│   ├── train.py                   ← training loop with resume + checkpointing
+│   └── main.py                    ← training phase orchestrator
+│
+├── evaluation/
+│   ├── inference.py               ← task-aware predictor
+│   ├── evaluate.py                ← metric computation + JSON save
+│   ├── results.py                 ← training curves + task-specific plots
+│   ├── main.py                    ← evaluation phase orchestrator
+│   └── metrics/
+│       ├── classification_metrics.py  ← Accuracy, P, R, F1, Confusion Matrix
+│       ├── detection_metrics.py       ← mAP@0.5:0.95 + AR (COCO, from scratch)
+│       └── segmentation_metrics.py    ← mIoU + Dice + Pixel Accuracy
+│
+├── Data/          ← raw + processed datasets
+├── Checkpoint/    ← model weights + training_manifest.json
+├── logs/          ← log files, results.csv, results.json, eval_metrics.json
+└── plots/         ← generated PNGs
 ```
 
 ---
@@ -45,7 +78,7 @@ cv_framework/
 ## Quick Start
 
 ```bash
-git clone <your-repo-url> && cd cv_framework
+git clone <repo-url> && cd cv_framework_v2
 pip install -r requirements.txt
 bash Run.sh
 ```
@@ -70,77 +103,132 @@ python main.py --stage training --resume
 # Override epochs without editing config
 python main.py --epochs 5
 
-# VM background run (safe to disconnect)
+# VM background run
 nohup bash Run.sh > run.log 2>&1 &
 tail -f logs/main.log
 ```
 
 ---
 
-## Configuring an Experiment
+## Switching Tasks
 
-Open `config.py` — it is the only file you need to edit.
-
-### Switch dataset
+Open `config.py` — change these two fields:
 
 ```python
-# Built-in torchvision dataset
-DATASET = {"source": "torchvision", "name": "CIFAR10", "in_channels": 3,
-           "num_classes": 10, "image_size": 32, ...}
+EXPERIMENT = {
+    "task": "classification",   # ← "classification" | "detection" | "segmentation"
+    "name": "my_experiment",
+    ...
+}
 
-# Local folder (ImageFolder format)
-DATASET = {"source": "local", "local_path": "/data/my_dataset", ...}
-
-# Direct URL to a zip file
-DATASET = {"source": "url", "url": "https://example.com/dataset.zip", ...}
-
-# GitHub folder or repo
-DATASET = {"source": "github", "url": "https://github.com/user/repo/tree/main/data", ...}
-```
-
-### Switch model
-
-```python
-# Standard architecture
-MODEL = {"type": "predefined", "name": "resnet18"}
-# Options: "lenet5", "alexnet", "vgg11", "vgg16", "resnet18", "resnet34"
-
-# Custom architecture (your own layer list)
 MODEL = {
-    "type": "custom",
-    "layer_configs": [
-        {"type": "conv",       "out_channels": 32, "kernel_size": 3, "padding": 1},
-        {"type": "batchnorm"},
-        {"type": "activation", "name": "relu"},
-        {"type": "pool",       "name": "max", "kernel_size": 2, "stride": 2},
-        {"type": "flatten"},
-        {"type": "linear",     "out_features": 10},
-    ]
+    "type": "predefined",
+    "name": "lenet5",           # ← see supported models below
+    ...
 }
 ```
 
-### Supported layer types for custom architectures
+The entire pipeline (loss, metrics, dataset format, model class, collate function, inference interpretation) adapts automatically.
 
-| Type | Required keys | Optional keys |
+---
+
+## Supported Models
+
+| Task | Model name | Notes |
 |---|---|---|
-| `conv` | `out_channels`, `kernel_size` | `stride` (1), `padding` (0) |
-| `pool` | `name` (max/avg), `kernel_size` | `stride` (=kernel_size) |
-| `activation` | `name` (relu/sigmoid/tanh/leakyrelu) | `negative_slope` |
-| `linear` | `out_features` | — |
-| `batchnorm` | — | — |
-| `dropout` | `p` | `spatial` (False) |
-| `flatten` | — | — |
-| `residual_block` | `out_channels` | `stride` (1), `activation` (relu) |
+| classification | `lenet5` | image_size=32, grayscale |
+| classification | `alexnet` | image_size≥64 |
+| classification | `vgg11` | image_size≥32 |
+| classification | `vgg16` | image_size≥32 |
+| classification | `resnet18` | image_size≥32 |
+| classification | `resnet34` | image_size≥32 |
+| detection | `yolov1` | image_size=448 |
+| detection | `ssd_mobilenet` | image_size=300 |
+| detection | `faster_rcnn` | image_size≥600 |
+| segmentation | `unet` | image_size≥256 |
+| segmentation | `fcn` | image_size≥256 |
+| segmentation | `deeplabv3` | image_size≥512 |
+
+---
+
+## Dataset Formats
+
+Set `DATASET["format"]` in config.py to match your data:
+
+### Classification
+| Format | Value | Structure |
+|---|---|---|
+| torchvision built-in | `"torchvision"` | Automatic (MNIST, CIFAR-10 etc.) |
+| ImageFolder | `"imagefolder"` | `class_name/image.jpg` |
+| CSV | `"csv"` | CSV with `image_path, label` columns |
+
+### Detection
+| Format | Value | Structure |
+|---|---|---|
+| YOLO txt | `"yolo"` | `images/` + `labels/*.txt` (cx cy w h class, normalised) |
+| COCO JSON | `"coco_json"` | `images/` + single JSON annotation file |
+| Pascal VOC | `"pascal_voc"` | `images/` + `annotations/*.xml` |
+
+### Segmentation
+| Format | Value | Structure |
+|---|---|---|
+| Image + Mask pairs | `"image_mask"` | `images/` + `masks/` (grayscale PNGs, values=class idx) |
+| COCO JSON polygons | `"coco_json"` | `images/` + COCO polygon annotation JSON |
+| Cityscapes | `"cityscapes"` | Standard Cityscapes `leftImg8bit/` + `gtFine/` tree |
+
+---
+
+## Supported Layer Types (Custom Architectures)
+
+Set `MODEL["type"] = "custom"` and define `MODEL["layer_configs"]` as a list of dicts:
+
+| Type | Required keys | Notes |
+|---|---|---|
+| `conv` | `out_channels`, `kernel_size` | `stride`, `padding` optional |
+| `pool` | `name` (max/avg), `kernel_size` | `stride` optional |
+| `activation` | `name` (relu/sigmoid/tanh/leakyrelu) | |
+| `linear` | `out_features` | After flatten |
+| `batchnorm` | — | Auto 1D/2D |
+| `dropout` | `p` | |
+| `flatten` | — | |
+| `residual_block` | `out_channels` | `stride`, `activation` optional |
+| `depthwise_conv` | `out_channels`, `kernel_size` | MobileNet-style |
+| `dilated_conv` | `out_channels`, `kernel_size`, `dilation` | Atrous conv |
+| `transposed_conv` | `out_channels`, `kernel_size` | Learnable upsample |
+| `bilinear_upsample` | `scale_factor` | Non-learnable upsample |
+| `aspp_block` | `out_channels` | `dilations` optional, default [6,12,18] |
+
+---
+
+## Loss Functions
+
+| Task | Default | Options |
+|---|---|---|
+| Classification | `cross_entropy` | `focal`, `label_smoothing` |
+| Detection | CIoU + Focal + BCE (combined) | `box_loss`: `ciou` \| `smooth_l1` |
+| Segmentation | BCE + Dice (combined) | `bce_dice`, `dice`, `cross_entropy` |
+
+Configure via `LOSS` section in `config.py`.
+
+---
+
+## Evaluation Metrics
+
+| Task | Metrics |
+|---|---|
+| Classification | Accuracy, Precision (macro), Recall (macro), F1 (macro), Confusion Matrix |
+| Detection | mAP@0.5, mAP@0.5:0.95, AR (full COCO suite, from scratch) |
+| Segmentation | mIoU, Dice Coefficient, Pixel Accuracy (per-class breakdowns in JSON) |
 
 ---
 
 ## Resume System
 
-A `pipeline_state.json` file is written atomically after every completed stage and after every training epoch.
+`pipeline_state.json` is written atomically after every stage and every training epoch:
 
 ```json
 {
-  "experiment": "mnist_lenet5",
+  "experiment": "cifar10_resnet18",
   "stages": {
     "dataset":    "done",
     "training":   {"status": "in_progress", "last_epoch": 12, "total_epochs": 50},
@@ -149,26 +237,8 @@ A `pipeline_state.json` file is written atomically after every completed stage a
 }
 ```
 
-Running `python main.py --resume` reads this file and:
-- Skips stages marked `done`
-- Resumes training from epoch 13 (loads `Checkpoint/latest.pth`)
-- Runs evaluation fresh when training completes
-
-Without `--resume`, the state file is always reset and all stages run fresh.
-
----
-
-## Adding a New Architecture
-
-1. Create `architectures/mynet.py` with a `build_mynet_config(num_classes)` function
-2. Add one line to `architectures/__init__.py`:
-   ```python
-   from architectures.mynet import build_mynet_config
-   REGISTRY["mynet"] = build_mynet_config
-   ```
-3. Set `MODEL = {"type": "predefined", "name": "mynet"}` in `config.py`
-
-Nothing else needs to change.
+`python main.py --resume` reads this and skips done stages, resumes training from epoch 13.
+Without `--resume` the state resets and all stages run fresh.
 
 ---
 
@@ -176,13 +246,25 @@ Nothing else needs to change.
 
 | File | Contents |
 |---|---|
-| `logs/results.csv` | Per-epoch metrics for all runs (Excel-friendly) |
+| `logs/results.csv` | Per-epoch metrics (Excel-friendly) |
 | `logs/results.json` | Same data in JSON (used by plots) |
-| `logs/eval_metrics.json` | Final test accuracy + confusion matrix |
+| `logs/eval_metrics.json` | Final test metrics + confusion matrix / per-class AP / per-class IoU |
 | `logs/*.log` | Per-phase log files with timestamps |
-| `Checkpoint/*_best.pth` | Best model weights (highest val accuracy) |
-| `Checkpoint/*_latest.pth` | Most recent epoch weights (for resume) |
-| `Checkpoint/training_manifest.json` | Handoff from training → evaluation |
-| `plots/val_accuracy_curves.png` | Val accuracy over epochs |
+| `Checkpoint/*_best.pth` | Best model weights |
+| `Checkpoint/*_latest.pth` | Most recent epoch (for resume) |
+| `Checkpoint/training_manifest.json` | Handoff: training → evaluation |
+| `plots/val_metric_curves.png` | Validation metric over epochs |
 | `plots/train_loss_curves.png` | Training loss over epochs |
-| `plots/confusion_matrix.png` | Test set confusion matrix heatmap |
+| `plots/confusion_matrix.png` | Classification: confusion matrix heatmap |
+| `plots/per_class_ap.png` | Detection: per-class AP bar chart |
+| `plots/per_class_iou.png` | Segmentation: per-class IoU bar chart |
+
+---
+
+## Adding a New Architecture
+
+1. Write `build_mymodel_config(num_classes, ...)` in the appropriate config file
+2. Add one entry to `REGISTRY` in `architectures/__init__.py`
+3. Set `MODEL["name"] = "mymodel"` in `config.py`
+
+Nothing else changes.

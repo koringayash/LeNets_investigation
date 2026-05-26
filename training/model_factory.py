@@ -1,63 +1,39 @@
 """
-training/model_factory.py
---------------------------
-Reads config.MODEL and builds the correct CNNModel instance.
+training/model_factory.py (v2)
+--------------------------------
+Reads config.MODEL and config.EXPERIMENT["task"] and returns the
+correct model instance (CNNModel / EncoderDecoderModel / DetectionModel).
 
-This is the single bridge between config.py and the architectures/
-package. No other file needs to know about the registry or individual
-architecture builders — they just call get_model() and receive a
-fully-constructed, ready-to-train CNNModel.
-
-Two modes
----------
-  "predefined" → looks up MODEL["name"] in the architecture registry,
-                 calls the matching builder, passes result to CNNModel.
-
-  "custom"     → passes MODEL["layer_configs"] directly to CNNModel.
-                 The user defines the full layer list in config.py.
-
-Usage
------
->>> from training.model_factory import get_model
->>> model = get_model()
->>> model.summary()
+Single entry point: get_model(). No other file needs to know about the
+architecture registry or individual model classes.
 """
 
 import logging
+from config    import MODEL, DATASET, TRAIN, EXPERIMENT
+from architectures import build_model
+from architectures.base import REQUIRED_KEYS
+from utils     import Timer
 
-from config        import MODEL, DATASET, TRAIN
-from architectures import build_model_config
-from architectures.base import CNNModel
-from utils         import Timer
 
-
-def get_model(logger: logging.Logger = None) -> CNNModel:
+def get_model(logger: logging.Logger = None):
     """
-    Build and return a CNNModel based on config.MODEL settings.
+    Build and return the correct model for the current task and config.
 
     Parameters
     ----------
     logger : logging.Logger, optional
-        Where to write build-time messages (parameter count, size, etc.)
 
     Returns
     -------
-    CNNModel  Fully constructed model, not yet moved to a device.
-              Call .to(device) on the returned model in train.py.
+    nn.Module  CNNModel | EncoderDecoderModel | DetectionModel
+               Not yet moved to a device — call .to(device) in train.py.
 
     Raises
     ------
-    ValueError  If MODEL["type"] is not "predefined" or "custom".
-    ValueError  If MODEL["type"] is "custom" but layer_configs is None.
-    ValueError  If MODEL["name"] is not found in the registry.
-
-    Example
-    -------
-    >>> model = get_model(logger=logger)
-    >>> model.summary()
-    >>> print(model.count_parameters())
+    ValueError  If task, model type, or model name is unrecognised.
     """
     log        = logger.info if logger else print
+    task       = EXPERIMENT["task"].lower()
     model_type = MODEL["type"].lower()
 
     input_shape = (
@@ -65,76 +41,79 @@ def get_model(logger: logging.Logger = None) -> CNNModel:
         DATASET["image_size"],
         DATASET["image_size"],
     )
+    num_classes = DATASET["num_classes"]
+    num_anchors = MODEL.get("num_anchors", 5)
+
+    log(f"Building model | task={task} | type={model_type}")
 
     with Timer("Building model", logger=logger):
+
         if model_type == "predefined":
-            layer_configs = _build_predefined(log)
+            name   = MODEL["name"].lower()
+            kwargs = _get_builder_kwargs(task, name)
+            model  = build_model(
+                task        = task,
+                name        = name,
+                input_shape = input_shape,
+                num_classes = num_classes,
+                num_anchors = num_anchors,
+                **kwargs,
+            )
 
         elif model_type == "custom":
             layer_configs = MODEL.get("layer_configs")
             if not layer_configs:
                 raise ValueError(
-                    "MODEL['layer_configs'] must be set when MODEL['type'] = 'custom'.\n"
-                    "Define your architecture as a list of layer dicts in config.py."
+                    "MODEL['layer_configs'] must be set when MODEL['type']='custom'."
                 )
-            log(f"Using custom architecture ({len(layer_configs)} layers)")
-
+            # Custom architectures use CNNModel for classification/sequential,
+            # EncoderDecoderModel for segmentation, DetectionModel for detection.
+            if task == "classification":
+                from architectures.classifier import CNNModel
+                model = CNNModel(layer_configs, input_shape=input_shape)
+            elif task == "segmentation":
+                from architectures.segmentor import EncoderDecoderModel
+                model = EncoderDecoderModel(layer_configs, input_shape=input_shape)
+            elif task == "detection":
+                from architectures.detector import DetectionModel
+                model = DetectionModel(
+                    layer_configs, input_shape=input_shape,
+                    num_classes=num_classes, num_anchors=num_anchors,
+                )
+            else:
+                raise ValueError(f"Unknown task '{task}'.")
         else:
             raise ValueError(
                 f"Unknown MODEL['type'] = '{MODEL['type']}'. "
                 f"Choose 'predefined' or 'custom'."
             )
 
-        model = CNNModel(layer_configs, input_shape=input_shape)
-
-    # Log key model stats
     model.summary()
-    log(f"Trainable parameters : {model.count_parameters():,}")
-    log(f"Estimated model size : {model.model_size_mb()} MB")
-    log(f"Input shape          : {model.get_input_shape()}")
-    log(f"Output shape         : {model.get_output_shape()}")
+    log(f"Parameters   : {model.count_parameters():,}")
+    log(f"Model size   : {model.model_size_mb()} MB")
 
     return model
 
 
-# ---------------------------------------------------------------------------
-# Private helper
-# ---------------------------------------------------------------------------
-
-def _build_predefined(log) -> list:
+def _get_builder_kwargs(task: str, name: str) -> dict:
     """
-    Look up the predefined model name in the registry and build its config.
+    Return architecture-specific kwargs for the config builder.
 
-    Passes architecture-specific kwargs from config where applicable:
-      - lenet5    : activation, pooling, num_classes
-      - alexnet   : num_classes
-      - vgg11/16  : num_classes
-      - resnet18/34: num_classes, input_size
-
-    Returns
-    -------
-    list of dict  Layer configs for CNNModel.
+    Different model families accept different keyword arguments.
+    This function maps (task, name) to the correct kwargs from config.
     """
-    name        = MODEL["name"].lower()
-    num_classes = DATASET["num_classes"]
-    image_size  = DATASET["image_size"]
+    if task == "classification":
+        if name == "lenet5":
+            return {
+                "activation": MODEL.get("activation", "relu"),
+                "pooling"   : MODEL.get("pooling",    "max"),
+            }
+        elif name in ("resnet18", "resnet34"):
+            return {"input_size": DATASET["image_size"]}
+        else:
+            return {}   # alexnet, vgg11, vgg16 only need num_classes (passed by build_model)
 
-    log(f"Building predefined model: {name}")
+    elif task in ("segmentation", "detection"):
+        return {}   # all segmentation/detection builders only need num_classes + num_anchors
 
-    # Architecture-specific kwargs
-    if name == "lenet5":
-        kwargs = {
-            "num_classes": num_classes,
-            "activation" : MODEL.get("activation", "relu"),
-            "pooling"    : MODEL.get("pooling",    "max"),
-        }
-    elif name in ("resnet18", "resnet34"):
-        kwargs = {
-            "num_classes": num_classes,
-            "input_size" : image_size,
-        }
-    else:
-        # alexnet, vgg11, vgg16
-        kwargs = {"num_classes": num_classes}
-
-    return build_model_config(name, **kwargs)
+    return {}

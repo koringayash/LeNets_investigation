@@ -1,70 +1,118 @@
 """
 architectures/base.py
 ---------------------
-The core CNNModel class — a configuration-driven sequential CNN builder
-extended from v1 with two major additions:
+Shared layer-building primitives used by all three model classes:
+  classifier.py  (CNNModel — sequential)
+  segmentor.py   (EncoderDecoderModel — U-Net style)
+  detector.py    (DetectionModel — backbone + neck + head)
 
-  1. ResidualBlock support — a new "residual_block" layer type that
-     implements skip connections for ResNet-style architectures.
-  2. Full (C, H, W) shape tracking through _build_all, so the first
-     Linear layer after Flatten always gets the correct in_features.
+This file contains
+------------------
+  1. All supported layer type definitions and validation constants.
+  2. Individual layer builder functions (_build_layer).
+  3. ResidualBlock nn.Module.
+  4. New v2 layer types: DepthwiseSeparableConv, DilatedConv,
+     TransposedConv, BilinearUpsample, ASPPBlock.
+  5. Shared shape-tracking utility (compute_conv_output_size).
 
-All architecture helpers (lenet.py, alexnet.py, etc.) return a list of
-layer-config dicts that get passed directly to CNNModel.
+What was removed from v1
+------------------------
+  CNNModel is now in architectures/classifier.py.
+  This file only provides building blocks — no model class.
 
-Beginners: This is the LEGO factory. You describe the bricks (layer dicts)
-and CNNModel assembles them into a working PyTorch model, validates the
-config, and gives you handy inspection tools like summary().
+Beginners: This is the parts warehouse. The three model files
+(classifier, segmentor, detector) are the assembly lines that
+use these parts to build complete networks.
 """
 
 import math
 import torch
 import torch.nn as nn
-from typing import List, Dict, Any, Tuple
+import torch.nn.functional as F
+from typing import Dict, Any, List
 
 
 # ---------------------------------------------------------------------------
-# Supported options (used for validation)
+# Supported options (validation constants)
 # ---------------------------------------------------------------------------
 
-_SUPPORTED_ACTIVATIONS = {"relu", "leakyrelu", "sigmoid", "tanh", "softmax"}
-_SUPPORTED_POOLS       = {"max", "avg"}
-_REQUIRED_KEYS: Dict[str, List[str]] = {
-    "conv"          : ["out_channels", "kernel_size"],
-    "pool"          : ["name", "kernel_size"],
-    "activation"    : ["name"],
-    "dropout"       : ["p"],
-    "flatten"       : [],
-    "linear"        : ["out_features"],
-    "batchnorm"     : [],
-    "residual_block": ["out_channels"],
+SUPPORTED_ACTIVATIONS = {"relu", "leakyrelu", "sigmoid", "tanh", "softmax"}
+SUPPORTED_POOLS       = {"max", "avg"}
+
+# Required keys per layer type — used by all model classes for validation
+REQUIRED_KEYS: Dict[str, List[str]] = {
+    "conv"              : ["out_channels", "kernel_size"],
+    "pool"              : ["name", "kernel_size"],
+    "activation"        : ["name"],
+    "dropout"           : ["p"],
+    "flatten"           : [],
+    "linear"            : ["out_features"],
+    "batchnorm"         : [],
+    "residual_block"    : ["out_channels"],
+    "depthwise_conv"    : ["out_channels", "kernel_size"],
+    "dilated_conv"      : ["out_channels", "kernel_size", "dilation"],
+    "transposed_conv"   : ["out_channels", "kernel_size"],
+    "bilinear_upsample" : ["scale_factor"],
+    "aspp_block"        : ["out_channels"],
 }
 
 
 # ---------------------------------------------------------------------------
-# ResidualBlock — a self-contained nn.Module for skip connections
+# Activation factory
+# ---------------------------------------------------------------------------
+
+def make_activation(name: str, cfg: dict = None) -> nn.Module:
+    """
+    Return the nn.Module for the requested activation function.
+
+    Parameters
+    ----------
+    name : str   Activation name (lowercase).
+    cfg  : dict  Optional full layer config (for extra params).
+
+    Returns
+    -------
+    nn.Module
+    """
+    cfg  = cfg or {}
+    name = name.lower()
+
+    if name == "relu":
+        return nn.ReLU(inplace=True)
+    elif name == "leakyrelu":
+        return nn.LeakyReLU(
+            negative_slope=cfg.get("negative_slope", 0.01), inplace=True
+        )
+    elif name == "sigmoid":
+        return nn.Sigmoid()
+    elif name == "tanh":
+        return nn.Tanh()
+    elif name == "softmax":
+        return nn.Softmax(dim=cfg.get("dim", 1))
+    else:
+        raise ValueError(
+            f"Unknown activation '{name}'. Choose from {SUPPORTED_ACTIVATIONS}."
+        )
+
+
+# ---------------------------------------------------------------------------
+# ResidualBlock  (v1 — unchanged)
 # ---------------------------------------------------------------------------
 
 class ResidualBlock(nn.Module):
     """
-    A single residual block as used in ResNet architectures (He et al. 2015).
+    Standard residual block with two 3×3 convolutions and a skip connection.
 
-    Architecture
-    ------------
-    Main path  : Conv(3×3, stride) → BN → Act → Conv(3×3, stride=1) → BN
-    Skip path  : Identity           (if in_channels == out_channels and stride == 1)
-                 Conv(1×1, stride) → BN  (if channels or spatial size changes)
-    Output     : Act(main_path + skip_path)
-
-    The 1×1 convolution on the skip path is called a "projection shortcut"
-    — it matches the dimensions so the addition is valid.
+    Main path  : Conv(3×3,s) → BN → Act → Conv(3×3,1) → BN
+    Skip path  : Identity  OR  Conv(1×1,s) → BN  (when dims change)
+    Output     : Act(main + skip)
 
     Parameters
     ----------
-    in_channels  : int   Number of input feature maps.
-    out_channels : int   Number of output feature maps.
-    stride       : int   Stride for the first conv. Use 2 to halve H and W.
-    activation   : str   Activation function name ("relu", "leakyrelu", etc.)
+    in_channels  : int
+    out_channels : int
+    stride       : int   Use 2 to halve spatial dimensions.
+    activation   : str
     """
 
     def __init__(
@@ -75,102 +123,297 @@ class ResidualBlock(nn.Module):
         activation  : str = "relu",
     ):
         super().__init__()
-
-        # ---- Main path ----------------------------------------------------
-        self.conv1 = nn.Conv2d(in_channels, out_channels,
-                               kernel_size=3, stride=stride, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(in_channels,  out_channels, 3, stride,  1, bias=False)
         self.bn1   = nn.BatchNorm2d(out_channels)
-        self.act1  = _make_activation(activation)
-
-        self.conv2 = nn.Conv2d(out_channels, out_channels,
-                               kernel_size=3, stride=1, padding=1, bias=False)
+        self.act1  = make_activation(activation)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, 1,       1, bias=False)
         self.bn2   = nn.BatchNorm2d(out_channels)
 
-        # ---- Skip (shortcut) path -----------------------------------------
-        # Needed when dimensions change (different channels or spatial stride)
-        if stride != 1 or in_channels != out_channels:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels,
-                          kernel_size=1, stride=stride, bias=False),
+        self.shortcut = (
+            nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, 1, stride, bias=False),
                 nn.BatchNorm2d(out_channels),
             )
-        else:
-            self.shortcut = nn.Identity()  # no parameters, just passes input through
-
-        self.act_out = _make_activation(activation)
+            if stride != 1 or in_channels != out_channels
+            else nn.Identity()
+        )
+        self.act_out = make_activation(activation)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass: compute main path + skip path, then activate.
-
-        Parameters
-        ----------
-        x : torch.Tensor  Shape (batch, in_channels, H, W)
-
-        Returns
-        -------
-        torch.Tensor  Shape (batch, out_channels, H', W')
-                      H' = H // stride,  W' = W // stride
-        """
         identity = self.shortcut(x)
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.act1(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-
-        out = self.act_out(out + identity)   # the skip connection addition
-        return out
+        out      = self.act1(self.bn1(self.conv1(x)))
+        out      = self.bn2(self.conv2(out))
+        return self.act_out(out + identity)
 
 
 # ---------------------------------------------------------------------------
-# Activation factory (used by ResidualBlock and _build_layer)
+# New v2 layer types
 # ---------------------------------------------------------------------------
 
-def _make_activation(name: str, cfg: dict = None) -> nn.Module:
+class DepthwiseSeparableConv(nn.Module):
     """
-    Return the nn.Module for the requested activation function.
+    Depthwise Separable Convolution (Howard et al., 2017 — MobileNet).
+
+    Splits a standard convolution into two steps:
+      1. Depthwise conv: one filter per input channel (spatial filtering)
+      2. Pointwise conv: 1×1 conv to combine channels (channel mixing)
+
+    This reduces computation by roughly 8-9× vs a standard conv of the
+    same kernel size, with minimal accuracy loss.
 
     Parameters
     ----------
-    name : str   Activation name (lowercase).
-    cfg  : dict  Optional full layer config dict (for extra params like
-                 negative_slope for LeakyReLU).
-
-    Returns
-    -------
-    nn.Module  The activation layer.
+    in_channels  : int
+    out_channels : int
+    kernel_size  : int
+    stride       : int  Default 1.
+    padding      : int  Default 0.
     """
-    cfg = cfg or {}
-    name = name.lower()
-    if name == "relu":
-        return nn.ReLU(inplace=True)
-    elif name == "leakyrelu":
-        return nn.LeakyReLU(negative_slope=cfg.get("negative_slope", 0.01), inplace=True)
-    elif name == "sigmoid":
-        return nn.Sigmoid()
-    elif name == "tanh":
-        return nn.Tanh()
-    elif name == "softmax":
-        return nn.Softmax(dim=cfg.get("dim", 1))
-    else:
-        raise ValueError(f"Unknown activation '{name}'. Choose from {_SUPPORTED_ACTIVATIONS}.")
+
+    def __init__(
+        self,
+        in_channels : int,
+        out_channels: int,
+        kernel_size : int,
+        stride      : int = 1,
+        padding     : int = 0,
+    ):
+        super().__init__()
+        # Depthwise: groups=in_channels means one filter per channel
+        self.depthwise = nn.Conv2d(
+            in_channels, in_channels, kernel_size,
+            stride=stride, padding=padding,
+            groups=in_channels, bias=False,
+        )
+        self.bn1 = nn.BatchNorm2d(in_channels)
+        self.act1 = nn.ReLU(inplace=True)
+
+        # Pointwise: 1×1 conv to mix channels
+        self.pointwise = nn.Conv2d(in_channels, out_channels, 1, bias=False)
+        self.bn2  = nn.BatchNorm2d(out_channels)
+        self.act2 = nn.ReLU(inplace=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.act1(self.bn1(self.depthwise(x)))
+        x = self.act2(self.bn2(self.pointwise(x)))
+        return x
+
+
+class DilatedConv(nn.Module):
+    """
+    Dilated (Atrous) Convolution.
+
+    A standard convolution with gaps in the filter, controlled by the
+    dilation rate. A dilation of 2 means the filter covers a 5×5 area
+    using only a 3×3 filter's parameters — larger receptive field for free.
+
+    Used in segmentation (DeepLab) and detection for multi-scale context.
+
+    Parameters
+    ----------
+    in_channels  : int
+    out_channels : int
+    kernel_size  : int
+    dilation     : int  Gap size between filter elements. 1 = standard conv.
+    padding      : int  Usually set to dilation to preserve spatial size.
+    """
+
+    def __init__(
+        self,
+        in_channels : int,
+        out_channels: int,
+        kernel_size : int,
+        dilation    : int,
+        stride      : int = 1,
+        padding     : int = None,   # auto = dilation for same-size output
+    ):
+        super().__init__()
+        if padding is None:
+            padding = dilation  # keeps H and W the same when kernel_size=3
+
+        self.conv = nn.Conv2d(
+            in_channels, out_channels, kernel_size,
+            stride=stride, padding=padding, dilation=dilation, bias=False,
+        )
+        self.bn  = nn.BatchNorm2d(out_channels)
+        self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.act(self.bn(self.conv(x)))
+
+
+class TransposedConv(nn.Module):
+    """
+    Transposed Convolution (Deconvolution) for upsampling.
+
+    Learnable upsampling — the network learns how to "spread" values to
+    a larger spatial resolution. Used in the decoder path of segmentation
+    models (U-Net, FCN) and generative networks.
+
+    Parameters
+    ----------
+    in_channels  : int
+    out_channels : int
+    kernel_size  : int  Usually 2 (doubles spatial size with stride=2).
+    stride       : int  Controls upsampling factor. stride=2 doubles H,W.
+    padding      : int  Default 0.
+    """
+
+    def __init__(
+        self,
+        in_channels : int,
+        out_channels: int,
+        kernel_size : int,
+        stride      : int = 2,
+        padding     : int = 0,
+    ):
+        super().__init__()
+        self.conv = nn.ConvTranspose2d(
+            in_channels, out_channels, kernel_size,
+            stride=stride, padding=padding, bias=False,
+        )
+        self.bn  = nn.BatchNorm2d(out_channels)
+        self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.act(self.bn(self.conv(x)))
+
+
+class BilinearUpsample(nn.Module):
+    """
+    Non-learnable bilinear upsampling followed by an optional conv.
+
+    Simpler and faster than TransposedConv. Often used in the decoder
+    path of DeepLab and similar architectures: upsample spatially with
+    interpolation, then refine with a conv layer.
+
+    Parameters
+    ----------
+    scale_factor : float  Multiplicative upsampling factor. 2.0 doubles H,W.
+    out_channels : int    If provided, adds a 1×1 conv after upsampling.
+                          Pass None to skip the conv (pure upsampling only).
+    in_channels  : int    Required only when out_channels is not None.
+    """
+
+    def __init__(
+        self,
+        scale_factor : float,
+        out_channels : int  = None,
+        in_channels  : int  = None,
+    ):
+        super().__init__()
+        self.scale_factor = scale_factor
+        self.conv = (
+            nn.Conv2d(in_channels, out_channels, 1, bias=False)
+            if out_channels is not None
+            else None
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = F.interpolate(
+            x,
+            scale_factor = self.scale_factor,
+            mode         = "bilinear",
+            align_corners= False,
+        )
+        if self.conv is not None:
+            x = self.conv(x)
+        return x
+
+
+class ASPPBlock(nn.Module):
+    """
+    Atrous Spatial Pyramid Pooling (Chen et al., 2017 — DeepLab v3).
+
+    Runs multiple dilated convolutions with different dilation rates in
+    parallel and concatenates their outputs. This captures context at
+    multiple scales simultaneously without losing spatial resolution.
+
+    Structure
+    ---------
+    Branch 1: 1×1 conv (no dilation)
+    Branch 2: 3×3 dilated conv, dilation=6
+    Branch 3: 3×3 dilated conv, dilation=12
+    Branch 4: 3×3 dilated conv, dilation=18
+    Branch 5: Global Average Pooling → 1×1 conv → upsample to input size
+    Output  : concat all 5 → 1×1 conv to out_channels
+
+    Parameters
+    ----------
+    in_channels  : int
+    out_channels : int  Output channels after the final 1×1 projection.
+    dilations    : list of int  Dilation rates for the 3 dilated branches.
+                               Default: [6, 12, 18] (DeepLab v3 defaults).
+    """
+
+    def __init__(
+        self,
+        in_channels : int,
+        out_channels: int,
+        dilations   : List[int] = None,
+    ):
+        super().__init__()
+        dilations = dilations or [6, 12, 18]
+        mid_ch    = out_channels // 4   # intermediate channels per branch
+
+        # Branch 1: 1×1 conv
+        self.b1 = nn.Sequential(
+            nn.Conv2d(in_channels, mid_ch, 1, bias=False),
+            nn.BatchNorm2d(mid_ch), nn.ReLU(inplace=True),
+        )
+
+        # Branches 2-4: dilated convolutions
+        self.dilated_branches = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(in_channels, mid_ch, 3,
+                          padding=d, dilation=d, bias=False),
+                nn.BatchNorm2d(mid_ch), nn.ReLU(inplace=True),
+            )
+            for d in dilations
+        ])
+
+        # Branch 5: Global Average Pooling
+        self.gap_branch = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_channels, mid_ch, 1, bias=False),
+            nn.BatchNorm2d(mid_ch), nn.ReLU(inplace=True),
+        )
+
+        # Final projection: 5 branches × mid_ch → out_channels
+        total_channels = mid_ch * (1 + len(dilations) + 1)
+        self.project = nn.Sequential(
+            nn.Conv2d(total_channels, out_channels, 1, bias=False),
+            nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h, w = x.shape[2], x.shape[3]
+
+        b1   = self.b1(x)
+        bds  = [b(x) for b in self.dilated_branches]
+        gap  = F.interpolate(
+            self.gap_branch(x), size=(h, w),
+            mode="bilinear", align_corners=False,
+        )
+
+        out = torch.cat([b1, *bds, gap], dim=1)
+        return self.project(out)
 
 
 # ---------------------------------------------------------------------------
-# Single-layer builder
+# Single-layer builder (used by all three model classes)
 # ---------------------------------------------------------------------------
 
-def _build_layer(cfg: Dict[str, Any], in_channels: int) -> nn.Module:
+def build_layer(cfg: Dict[str, Any], in_channels: int) -> nn.Module:
     """
     Translate one layer-config dict into an nn.Module.
 
+    Called by classifier.py, segmentor.py, and detector.py.
+
     Parameters
     ----------
-    cfg         : dict  One entry from the layer_configs list.
-    in_channels : int   Channels / features coming into this layer.
+    cfg         : dict  One entry from a layer_configs list.
+    in_channels : int   Input channels / features for this layer.
 
     Returns
     -------
@@ -184,272 +427,103 @@ def _build_layer(cfg: Dict[str, Any], in_channels: int) -> nn.Module:
 
     if ltype == "conv":
         return nn.Conv2d(
-            in_channels  = in_channels,
-            out_channels = cfg["out_channels"],
-            kernel_size  = cfg["kernel_size"],
-            stride       = cfg.get("stride",  1),
-            padding      = cfg.get("padding", 0),
+            in_channels, cfg["out_channels"], cfg["kernel_size"],
+            stride=cfg.get("stride", 1), padding=cfg.get("padding", 0),
         )
-
     elif ltype == "pool":
-        name        = cfg["name"].lower()
-        kernel_size = cfg["kernel_size"]
-        stride      = cfg.get("stride", kernel_size)
-        padding     = cfg.get("padding", 0)
+        name = cfg["name"].lower()
+        k, s = cfg["kernel_size"], cfg.get("stride", cfg["kernel_size"])
+        p    = cfg.get("padding", 0)
         if name == "max":
-            return nn.MaxPool2d(kernel_size=kernel_size, stride=stride, padding=padding)
-        elif name == "avg":
-            return nn.AvgPool2d(kernel_size=kernel_size, stride=stride, padding=padding)
-        else:
-            raise ValueError(f"Unknown pool type '{name}'.")
+            return nn.MaxPool2d(k, s, p)
+        return nn.AvgPool2d(k, s, p)
 
     elif ltype == "activation":
-        return _make_activation(cfg["name"], cfg)
+        return make_activation(cfg["name"], cfg)
 
     elif ltype == "dropout":
-        p       = cfg.get("p", 0.5)
-        spatial = cfg.get("spatial", False)
-        return nn.Dropout2d(p=p) if spatial else nn.Dropout(p=p)
+        return nn.Dropout2d(cfg["p"]) if cfg.get("spatial") else nn.Dropout(cfg["p"])
 
     elif ltype == "flatten":
         return nn.Flatten(start_dim=1)
 
     elif ltype == "linear":
-        return nn.Linear(in_features=in_channels, out_features=cfg["out_features"])
+        return nn.Linear(in_channels, cfg["out_features"])
 
     elif ltype == "batchnorm":
-        is_flat = cfg.get("_is_flat", False)
-        return nn.BatchNorm1d(in_channels) if is_flat else nn.BatchNorm2d(in_channels)
+        return (
+            nn.BatchNorm1d(in_channels)
+            if cfg.get("_is_flat")
+            else nn.BatchNorm2d(in_channels)
+        )
 
     elif ltype == "residual_block":
         return ResidualBlock(
+            in_channels, cfg["out_channels"],
+            stride=cfg.get("stride", 1),
+            activation=cfg.get("activation", "relu"),
+        )
+
+    elif ltype == "depthwise_conv":
+        return DepthwiseSeparableConv(
+            in_channels, cfg["out_channels"], cfg["kernel_size"],
+            stride=cfg.get("stride", 1), padding=cfg.get("padding", 0),
+        )
+
+    elif ltype == "dilated_conv":
+        return DilatedConv(
+            in_channels, cfg["out_channels"], cfg["kernel_size"],
+            dilation=cfg["dilation"],
+            stride=cfg.get("stride", 1),
+            padding=cfg.get("padding", None),
+        )
+
+    elif ltype == "transposed_conv":
+        return TransposedConv(
+            in_channels, cfg["out_channels"], cfg["kernel_size"],
+            stride=cfg.get("stride", 2), padding=cfg.get("padding", 0),
+        )
+
+    elif ltype == "bilinear_upsample":
+        return BilinearUpsample(
+            scale_factor = cfg["scale_factor"],
+            out_channels = cfg.get("out_channels"),
+            in_channels  = in_channels if cfg.get("out_channels") else None,
+        )
+
+    elif ltype == "aspp_block":
+        return ASPPBlock(
             in_channels  = in_channels,
             out_channels = cfg["out_channels"],
-            stride       = cfg.get("stride",     1),
-            activation   = cfg.get("activation", "relu"),
+            dilations    = cfg.get("dilations", [6, 12, 18]),
         )
 
     else:
         raise ValueError(
             f"Unknown layer type '{ltype}'. "
-            f"Supported: {list(_REQUIRED_KEYS.keys())}"
+            f"Supported: {list(REQUIRED_KEYS.keys())}"
         )
 
 
 # ---------------------------------------------------------------------------
-# CNNModel
+# Shape tracking utility
 # ---------------------------------------------------------------------------
 
-class CNNModel(nn.Module):
+def compute_spatial_size(h: int, k: int, s: int, p: int) -> int:
     """
-    A configuration-driven sequential CNN that supports all standard layer
-    types including residual blocks for ResNet-style architectures.
+    Compute output spatial size for conv or pool along one axis.
+
+    Formula: floor((H + 2*p - k) / s) + 1
 
     Parameters
     ----------
-    layer_configs : list of dict
-        Ordered list of layer descriptions. Each dict must have a "type" key.
-    input_shape   : tuple (C, H, W)
-        Shape of a single input sample — no batch dimension.
+    h : int  Input size.
+    k : int  Kernel size.
+    s : int  Stride.
+    p : int  Padding.
 
-    Example
+    Returns
     -------
-    >>> from architectures.lenet import build_lenet_config
-    >>> cfg   = build_lenet_config("relu", "max")
-    >>> model = CNNModel(cfg, input_shape=(1, 32, 32))
-    >>> model.summary()
+    int  Output size.
     """
-
-    def __init__(
-        self,
-        layer_configs: List[Dict[str, Any]],
-        input_shape  : Tuple[int, int, int],
-    ):
-        super().__init__()
-        self._input_shape   = input_shape
-        self._layer_cfgs    = layer_configs
-        self._output_shapes : List[Tuple] = []
-
-        self._validate(layer_configs)
-        layers, self._layer_names = self._build_all(layer_configs, input_shape)
-        self.model = nn.Sequential(*layers)
-        self._trace_shapes(input_shape)
-
-    # -----------------------------------------------------------------------
-    # Validation
-    # -----------------------------------------------------------------------
-
-    def _validate(self, layer_configs: List[Dict[str, Any]]) -> None:
-        """Validate every config dict before any PyTorch objects are created."""
-        for i, cfg in enumerate(layer_configs):
-            if not isinstance(cfg, dict):
-                raise TypeError(f"Layer {i}: expected dict, got {type(cfg).__name__}.")
-            if "type" not in cfg:
-                raise ValueError(f"Layer {i}: missing required key 'type'.")
-            ltype = cfg["type"].lower()
-            if ltype not in _REQUIRED_KEYS:
-                raise ValueError(f"Layer {i}: unknown type '{ltype}'.")
-            for key in _REQUIRED_KEYS[ltype]:
-                if key not in cfg:
-                    raise ValueError(f"Layer {i} (type='{ltype}'): missing key '{key}'.")
-            if ltype == "activation" and cfg["name"].lower() not in _SUPPORTED_ACTIVATIONS:
-                raise ValueError(f"Layer {i}: unknown activation '{cfg['name']}'.")
-            if ltype == "pool" and cfg["name"].lower() not in _SUPPORTED_POOLS:
-                raise ValueError(f"Layer {i}: unknown pool '{cfg['name']}'.")
-            if ltype == "dropout":
-                p = cfg.get("p", 0.5)
-                if not (0.0 <= p < 1.0):
-                    raise ValueError(f"Layer {i}: dropout p must be in [0,1), got {p}.")
-
-    # -----------------------------------------------------------------------
-    # Build layers with full (C, H, W) shape tracking
-    # -----------------------------------------------------------------------
-
-    def _build_all(
-        self,
-        layer_configs: List[Dict[str, Any]],
-        input_shape  : Tuple[int, int, int],
-    ) -> Tuple[List[nn.Module], List[str]]:
-        """
-        Convert every config dict into an nn.Module, tracking (C, H, W)
-        throughout so Linear layers always get the correct in_features.
-        """
-        layers      : List[nn.Module] = []
-        layer_names : List[str]       = []
-
-        C, H, W = input_shape
-        is_flat  = False
-
-        for cfg in layer_configs:
-            ltype = cfg["type"].lower()
-            current_features = C if not is_flat else C  # C holds flat count after flatten
-
-            if ltype == "batchnorm":
-                cfg = {**cfg, "_is_flat": is_flat}
-
-            layer = _build_layer(cfg, in_channels=current_features)
-            layers.append(layer)
-
-            # Update running shape and build human-readable name
-            if ltype == "conv":
-                k, s, p = cfg["kernel_size"], cfg.get("stride", 1), cfg.get("padding", 0)
-                H = math.floor((H + 2*p - k) / s) + 1
-                W = math.floor((W + 2*p - k) / s) + 1
-                name = f"Conv2d({C}→{cfg['out_channels']}, k={k}, s={s}, p={p})"
-                C    = cfg["out_channels"]
-
-            elif ltype == "pool":
-                k = cfg["kernel_size"]
-                s = cfg.get("stride", k)
-                p = cfg.get("padding", 0)
-                H = math.floor((H + 2*p - k) / s) + 1
-                W = math.floor((W + 2*p - k) / s) + 1
-                name = f"{cfg['name'].capitalize()}Pool2d(k={k}, s={s})"
-
-            elif ltype == "residual_block":
-                # ResidualBlock: kernel=3, padding=1 → H,W only change with stride
-                s    = cfg.get("stride", 1)
-                H    = math.ceil(H / s)
-                W    = math.ceil(W / s)
-                name = (f"ResidualBlock({C}→{cfg['out_channels']}, "
-                        f"s={s}, act={cfg.get('activation','relu')})")
-                C    = cfg["out_channels"]
-
-            elif ltype == "flatten":
-                flat_size = C * H * W
-                name      = f"Flatten [{C}×{H}×{W} → {flat_size}]"
-                C, H, W   = flat_size, 1, 1
-                is_flat   = True
-
-            elif ltype == "linear":
-                out = cfg["out_features"]
-                name = f"Linear({C}→{out})"
-                C    = out
-
-            elif ltype == "activation":
-                name = cfg["name"].capitalize()
-
-            elif ltype == "dropout":
-                name = f"Dropout(p={cfg.get('p', 0.5)})"
-
-            elif ltype == "batchnorm":
-                name = f"BatchNorm({'1d' if is_flat else '2d'})"
-
-            else:
-                name = ltype.capitalize()
-
-            layer_names.append(name)
-
-        return layers, layer_names
-
-    # -----------------------------------------------------------------------
-    # Shape tracing
-    # -----------------------------------------------------------------------
-
-    def _trace_shapes(self, input_shape: Tuple[int, int, int]) -> None:
-        """Run a dummy forward pass to record exact output shapes per layer."""
-        self._output_shapes = []
-        dummy = torch.zeros(1, *input_shape)
-        with torch.no_grad():
-            x = dummy
-            for layer in self.model:
-                x = layer(x)
-                self._output_shapes.append(tuple(x.shape[1:]))
-
-    # -----------------------------------------------------------------------
-    # Forward
-    # -----------------------------------------------------------------------
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
-
-    # -----------------------------------------------------------------------
-    # Public inspection methods
-    # -----------------------------------------------------------------------
-
-    def summary(self) -> None:
-        """Print a Keras-style summary table with real output shapes."""
-        param_counts = [
-            sum(p.numel() for p in layer.parameters() if p.requires_grad)
-            for layer in self.model
-        ]
-        total = sum(param_counts)
-        col_w = [5, 42, 16, 10]
-        sep   = "-" * (sum(col_w) + 9)
-        thick = "=" * (sum(col_w) + 9)
-
-        print(thick)
-        print("  CNN Architecture Summary")
-        print(thick)
-        print(f"  Input shape  : {self._input_shape}")
-        print(sep)
-        print(f"  {'#':<{col_w[0]}}| {'Layer':<{col_w[1]}}| {'Output shape':<{col_w[2]}}| {'Params':>{col_w[3]}}")
-        print(sep)
-        for i, (name, shape, params) in enumerate(
-            zip(self._layer_names, self._output_shapes, param_counts)
-        ):
-            print(f"  {i:<{col_w[0]}}| {name:<{col_w[1]}}| {str(shape):<{col_w[2]}}| {params:>{col_w[3]},}")
-        print(thick)
-        print(f"  Total trainable parameters: {total:,}")
-        print(f"  Estimated size            : {self.model_size_mb()} MB")
-        print(thick)
-
-    def count_parameters(self) -> int:
-        """Return total trainable parameter count."""
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
-    def get_input_shape(self) -> Tuple:
-        """Return expected input shape (C, H, W) — no batch dim."""
-        return self._input_shape
-
-    def get_output_shape(self) -> Tuple:
-        """Return the model's final output shape for one sample."""
-        return self._output_shapes[-1] if self._output_shapes else None
-
-    def get_layer_output_shapes(self) -> List[Tuple]:
-        """Return output shapes for every layer — useful for debugging."""
-        return list(self._output_shapes)
-
-    def model_size_mb(self) -> float:
-        """Approximate model size in MB (float32 = 4 bytes per parameter)."""
-        return round(self.count_parameters() * 4 / (1024 ** 2), 4)
+    return math.floor((h + 2 * p - k) / s) + 1
