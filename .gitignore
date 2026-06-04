@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+.pytest_cache/
+
+# Virtualenv
+venv/
+venv*/
+
+# Editor directories and files
+.vscode/
+.idea/
+
+# Data, checkpoints, logs
+Data/
+Checkpoint/
+logs/
+plots/
+*.pth
+*.pt
+
+# Local config and state
+pipeline_state.json
